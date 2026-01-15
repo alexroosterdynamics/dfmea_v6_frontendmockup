@@ -44,8 +44,8 @@ function Pill({ tone = "neutral", className = "", children }) {
     tone === "bad"
       ? "bg-amber-50 border-amber-200/70 text-amber-900"
       : tone === "good"
-      ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
-      : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
+        ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
+        : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
 
   return (
     <span
@@ -105,8 +105,8 @@ function SmallBtn({ active, disabled, onClick, title, children }) {
         active
           ? "bg-zinc-900 text-white border-zinc-900"
           : disabled
-          ? "bg-white border-zinc-200/60 text-zinc-300 cursor-not-allowed"
-          : "bg-white border-zinc-200/80 text-zinc-700 hover:bg-zinc-100"
+            ? "bg-white border-zinc-200/60 text-zinc-300 cursor-not-allowed"
+            : "bg-white border-zinc-200/80 text-zinc-700 hover:bg-zinc-100"
       )}
     >
       {children}
@@ -142,12 +142,12 @@ function AiChecklist({ items }) {
   const list = items?.length
     ? items
     : [
-        "Add numeric acceptance criteria (values + tolerances)",
-        "Include units (dB, hours, °C, V, mA, ms)",
-        "Define operating conditions (mode, load, environment)",
-        "Specify test method (verification approach)",
-        "Clarify boundaries / edge cases (min/max, startup, aging)"
-      ];
+      "Add numeric acceptance criteria (values + tolerances)",
+      "Include units (dB, hours, °C, V, mA, ms)",
+      "Define operating conditions (mode, load, environment)",
+      "Specify test method (verification approach)",
+      "Clarify boundaries / edge cases (min/max, startup, aging)"
+    ];
 
   return (
     <div className="rounded-xl border border-zinc-200/80 bg-white p-4">
@@ -333,12 +333,8 @@ function Editor({
 }
 
 /* ----------------------------- Component ----------------------------- */
-export default function RequirementsViewport({
-  data,
-  onUpdateRequirements,
-  requirementsUnlocked,
-  onListViewUnlock
-}) {
+export default function RequirementsViewport({ data, onUpdateRequirements, onListViewUnlock }) {
+
   const projectName = data?.content?.projectName ?? "DFMEA Project";
   const requirements = data?.content?.requirements ?? [];
   const changeNotices = data?.content?.changeNotices ?? [];
@@ -362,8 +358,14 @@ export default function RequirementsViewport({
   const [saving, setSaving] = useState({});
   const [running, setRunning] = useState({});
 
-  // ✅ ONLY keep pushing notices to context (no UI here)
-  const { pushChangeNotice, cleanupTimers } = useDFMEA();
+  // ✅ Context: notices + requirements gating
+  const {
+    pushChangeNotice,
+    cleanupTimers,
+    setRequirementsComplete,
+    unlockFromRequirementsListView,
+    requirementsDevUnlocked
+  } = useDFMEA();
 
   // reset per tab
   useEffect(() => {
@@ -412,17 +414,17 @@ export default function RequirementsViewport({
 
     return ok
       ? {
-          pass: true,
-          title: "Low ambiguity • traceable",
-          reasoning:
-            "Requirement includes measurable targets and testable constraints (values + conditions). This reduces interpretation risk and supports DFMEA linkage."
-        }
+        pass: true,
+        title: "Low ambiguity • traceable",
+        reasoning:
+          "Requirement includes measurable targets and testable constraints (values + conditions). This reduces interpretation risk and supports DFMEA linkage."
+      }
       : {
-          pass: false,
-          title: "High ambiguity • risk flagged",
-          reasoning:
-            "Risk Analysis indicates this requirement is not sufficiently testable/traceable. Add numeric targets + units + operating conditions and a clear test method."
-        };
+        pass: false,
+        title: "High ambiguity • risk flagged",
+        reasoning:
+          "Risk Analysis indicates this requirement is not sufficiently testable/traceable. Add numeric targets + units + operating conditions and a clear test method."
+      };
   }
 
   function updateAll(next) {
@@ -438,7 +440,6 @@ export default function RequirementsViewport({
   }
 
   function getNextId() {
-    // Try to generate REQ-### if existing IDs match; fallback to timestamp.
     const nums = requirements
       .map((r) => String(r.id || ""))
       .map((s) => {
@@ -484,13 +485,12 @@ export default function RequirementsViewport({
 
   // ADD new requirement (must be complete before insert)
   function handleAddSave(tempReq) {
-    const tempId = tempReq.id; // stable key for running/saving state + draft
+    const tempId = tempReq.id;
     const details = draft[tempId] ?? "";
     const text = (addText || "").trim();
 
     setAddError("");
 
-    // Must pass the same ambiguity/testability check BEFORE we add it
     const res = analyze(text, details);
 
     if (!text || text.length < 8) {
@@ -529,11 +529,9 @@ export default function RequirementsViewport({
       }
     };
 
-    // simulate the same “save + analysis” feel
     setTimeout(() => {
       updateAll([newReq, ...requirements]);
 
-      // cleanup the temp editor state
       setDraft((p) => {
         const next = { ...p };
         delete next[tempId];
@@ -556,6 +554,14 @@ export default function RequirementsViewport({
     const flagged = requirements.filter((r) => r.flagged).length;
     return { total, frozen: ok, flagged, unfrozen: total - ok };
   }, [requirements]);
+
+  // ✅ REAL unlock rule: requirements complete when EVERYTHING is frozen (and at least 1 exists)
+  useEffect(() => {
+    const done = stats.total > 0 && stats.frozen === stats.total;
+    setRequirementsComplete?.(done);
+  }, [stats.total, stats.frozen, setRequirementsComplete]);
+
+  const requirementsUnlocked = (stats.total > 0 && stats.frozen === stats.total) || requirementsDevUnlocked;
 
   const buckets = useMemo(() => {
     const map = { Software: [], Electrical: [], Mechanical: [] };
@@ -604,8 +610,8 @@ export default function RequirementsViewport({
         showMode === "all"
           ? list
           : showMode === "frozen"
-          ? list.filter((r) => frozen(r))
-          : list.filter((r) => !frozen(r));
+            ? list.filter((r) => frozen(r))
+            : list.filter((r) => !frozen(r));
     });
     return out;
   }, [buckets, showMode]);
@@ -614,19 +620,19 @@ export default function RequirementsViewport({
     cardSize === "xs"
       ? "grid grid-cols-5 gap-3"
       : cardSize === "sm"
-      ? "grid grid-cols-4 gap-3"
-      : cardSize === "lg"
-      ? "grid grid-cols-2 gap-4"
-      : "grid grid-cols-3 gap-4";
+        ? "grid grid-cols-4 gap-3"
+        : cardSize === "lg"
+          ? "grid grid-cols-2 gap-4"
+          : "grid grid-cols-3 gap-4";
 
   const cardPad =
     cardSize === "xs"
       ? "p-3"
       : cardSize === "sm"
-      ? "p-3.5"
-      : cardSize === "lg"
-      ? "p-5"
-      : "p-4";
+        ? "p-3.5"
+        : cardSize === "lg"
+          ? "p-5"
+          : "p-4";
 
   function smaller() {
     setCardSize((s) => (s === "lg" ? "md" : s === "md" ? "sm" : "xs"));
@@ -637,7 +643,6 @@ export default function RequirementsViewport({
 
   const modalReq = modalId ? requirements.find((r) => r.id === modalId) : null;
 
-  // temp add "requirement object" for editor compatibility (stable id for state keys)
   const addTemp = useMemo(
     () => ({
       id: "__NEW__",
@@ -733,7 +738,12 @@ export default function RequirementsViewport({
                 active={viewMode === "list"}
                 onClick={() => {
                   setViewMode("list");
+
+                  // ✅ Unlock sheets (Page.js state)
                   onListViewUnlock?.();
+
+                  // ✅ (optional) keep context unlock if you still use it elsewhere
+                  unlockFromRequirementsListView?.();
                 }}
                 title="List view"
               >
@@ -835,7 +845,11 @@ export default function RequirementsViewport({
                               </div>
                             </div>
 
-                            <ChevronRight size={16} strokeWidth={1.8} className="text-zinc-400 mt-1" />
+                            <ChevronRight
+                              size={16}
+                              strokeWidth={1.8}
+                              className="text-zinc-400 mt-1"
+                            />
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -858,7 +872,11 @@ export default function RequirementsViewport({
                             </div>
 
                             <div className="text-[11px] text-zinc-600 inline-flex items-center gap-2">
-                              <Paperclip size={14} strokeWidth={1.7} className="text-zinc-500" />
+                              <Paperclip
+                                size={14}
+                                strokeWidth={1.7}
+                                className="text-zinc-500"
+                              />
                               {filesCount}
                             </div>
                           </div>
@@ -941,7 +959,11 @@ export default function RequirementsViewport({
 
                           <div className="col-span-1 px-5 py-3 text-right text-zinc-600">
                             <span className="inline-flex items-center justify-end gap-2">
-                              <Paperclip size={14} strokeWidth={1.7} className="text-zinc-500" />
+                              <Paperclip
+                                size={14}
+                                strokeWidth={1.7}
+                                className="text-zinc-500"
+                              />
                               {filesCount}
                             </span>
                           </div>

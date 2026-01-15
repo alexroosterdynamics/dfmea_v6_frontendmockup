@@ -158,8 +158,12 @@ export default function Page() {
 
         <div className="hidden lg:flex h-full flex-col overflow-hidden">
           {/* ✅ TopNav should stay on the last real sheet */}
-          <TopNav tabs={tabs} activeTab={activeSheetTab} onChangeTab={handleChangeTab} />
-
+          <TopNav
+            tabs={tabs}
+            activeTab={activeSheetTab}
+            onChangeTab={handleChangeTab}
+            unlockSheets={canAccessOtherTabs} // ✅ includes listViewUnlocked
+          />
           <div className="flex flex-1 overflow-hidden">
             <Sidebar
               tasksTitle={tabDataMap[activeTab].tasksTitle}

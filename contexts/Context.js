@@ -27,6 +27,13 @@ export function DFMEAProvider({ children }) {
 
   const timersRef = useRef([]);
 
+  // ✅ Requirements gating state
+  // "requirementsComplete" unlocks the other sheets normally
+  const [requirementsComplete, setRequirementsComplete] = useState(false);
+
+  // "requirementsDevUnlocked" unlocks other sheets early when using dev option
+  const [requirementsDevUnlocked, setRequirementsDevUnlocked] = useState(false);
+
   const cleanupTimers = useCallback(() => {
     timersRef.current.forEach((t) => clearTimeout(t));
     timersRef.current = [];
@@ -65,6 +72,16 @@ export function DFMEAProvider({ children }) {
     setUnreadCount(0);
   }, []);
 
+  // ✅ Gating helpers
+  const unlockFromRequirementsListView = useCallback(() => {
+    setRequirementsDevUnlocked(true);
+  }, []);
+
+  const resetRequirementsUnlocks = useCallback(() => {
+    setRequirementsComplete(false);
+    setRequirementsDevUnlocked(false);
+  }, []);
+
   const value = useMemo(
     () => ({
       activeNotice,
@@ -74,7 +91,14 @@ export function DFMEAProvider({ children }) {
       pushChangeNotice,
       dismissActiveNotice,
       markAllRead,
-      cleanupTimers
+      cleanupTimers,
+
+      // ✅ expose gating state
+      requirementsComplete,
+      setRequirementsComplete,
+      requirementsDevUnlocked,
+      unlockFromRequirementsListView,
+      resetRequirementsUnlocks
     }),
     [
       activeNotice,
@@ -84,7 +108,11 @@ export function DFMEAProvider({ children }) {
       pushChangeNotice,
       dismissActiveNotice,
       markAllRead,
-      cleanupTimers
+      cleanupTimers,
+      requirementsComplete,
+      requirementsDevUnlocked,
+      unlockFromRequirementsListView,
+      resetRequirementsUnlocks
     ]
   );
 

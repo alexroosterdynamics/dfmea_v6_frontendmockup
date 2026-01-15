@@ -12,8 +12,8 @@ function Pill({ tone = "neutral", children }) {
     tone === "good"
       ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
       : tone === "busy"
-        ? "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700"
-        : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
+      ? "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700"
+      : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
 
   return (
     <span className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}>
@@ -22,53 +22,33 @@ function Pill({ tone = "neutral", children }) {
   );
 }
 
-/** Small skeleton helpers */
+/** Small skeleton helper */
 function SkeletonLine({ w = "w-full" }) {
   return <div className={cx("h-3 rounded-md bg-zinc-200/80", w)} />;
 }
 
-function SkeletonPill({ w = "w-20" }) {
-  return <div className={cx("h-6 rounded-full bg-zinc-200/80", w)} />;
-}
-
-function ActiveNoticeSkeleton({ requestedBy, timestamp }) {
+/** ✅ AI Analysis block (only this becomes skeleton when busy) */
+function AiAnalysisBlock({ busy }) {
   return (
-    <div className="min-w-0 flex-1 animate-pulse">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="h-4 w-44 bg-zinc-200/80 rounded-md" />
-          <div className="mt-2 space-y-2">
-            <SkeletonLine w="w-[92%]" />
-            <SkeletonLine w="w-[78%]" />
-          </div>
-        </div>
+    <div className="mt-3 rounded-xl border border-zinc-200/80 bg-white p-3">
+      <div className="text-[11px] text-zinc-500">AI analysis</div>
 
-        <div className="h-8 w-8 rounded-xl bg-zinc-200/80" />
-      </div>
-
-      <div className="mt-3 flex items-center gap-2">
-        <SkeletonPill w="w-24" />
-        <SkeletonPill w="w-20" />
-        <SkeletonPill w="w-28" />
-      </div>
-
-      <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
-        <div className="h-3 w-16 bg-zinc-200/80 rounded-md" />
-        <div className="mt-2 space-y-2">
-          <SkeletonLine w="w-[86%]" />
+      {busy ? (
+        <div className="mt-2 space-y-2 animate-pulse">
+          <SkeletonLine w="w-[92%]" />
+          <SkeletonLine w="w-[78%]" />
           <SkeletonLine w="w-[64%]" />
         </div>
-      </div>
-
-      {/* optional: keep real pills if you want, but skeletons already cover */}
-      <div className="sr-only">
-        {requestedBy} {timestamp}
-      </div>
+      ) : (
+        <div className="mt-2 text-[12px] text-zinc-700 leading-snug">
+          Risk analysis complete. No critical downstream effects detected.
+        </div>
+      )}
     </div>
   );
 }
 
-export default function TopNav({ tabs, activeTab, onChangeTab }) {
+export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = false }) {
   const containerRef = useRef(null);
   const tabRefs = useRef({});
   const [indicator, setIndicator] = useState({ x: 0, w: 0, ready: false });
@@ -166,44 +146,71 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
             {tabs.map((t) => {
               const isActive = t.id === activeTab;
 
-              // ✅ TODO: replace this with your real state from Context
-              // Example: const { requirementsComplete } = useDFMEA();
-              const requirementsComplete = false;
-
-              // ✅ Lock everything except Requirements when it's not complete
+              // ✅ only requirements is always accessible
               const isRequirementsTab = t.id === "requirements";
-              const locked = !requirementsComplete && !isRequirementsTab;
 
-              const lockedTooltip =
-                "Locked — finish Requirements first to unlock this sheet. Dev option: open Requirements → “List view” to unlock early.";
+              // ✅ locked until unlockSheets becomes true
+              const locked = !unlockSheets && !isRequirementsTab;
 
               return (
-                <button
+                <div
                   key={t.id}
                   ref={(node) => {
                     if (node) tabRefs.current[t.id] = node;
                   }}
-                  disabled={locked}
-                  aria-disabled={locked}
-                  title={locked ? lockedTooltip : undefined}
-                  onClick={() => {
-                    if (locked) return;        // ✅ prevents click
-                    onChangeTab(t.id);
-                  }}
-                  className={cx(
-                    "relative z-10 text-[13px] px-3 py-1.5 rounded-lg",
-                    "font-medium tracking-tight transition-colors duration-200",
-                    isActive ? "text-white" : "text-zinc-700",
-
-                    // ✅ normal hover only when unlocked
-                    !locked && !isActive ? "hover:text-zinc-900" : "",
-
-                    // ✅ locked styling (makes it VERY obvious)
-                    locked ? "opacity-45 cursor-not-allowed" : "cursor-pointer"
-                  )}
+                  className="relative group"
                 >
-                  {t.label}
-                </button>
+                  <button
+                    type="button"
+                    disabled={locked}
+                    aria-disabled={locked}
+                    onClick={() => {
+                      if (locked) return;
+                      onChangeTab(t.id);
+                    }}
+                    className={cx(
+                      "relative z-10 text-[13px] px-3 py-1.5 rounded-lg",
+                      "font-medium tracking-tight transition-colors duration-200",
+                      isActive ? "text-white" : "text-zinc-700",
+                      !locked && !isActive ? "hover:text-zinc-900" : "",
+                      locked ? "opacity-45 cursor-not-allowed" : "cursor-pointer"
+                    )}
+                  >
+                    {t.label}
+                  </button>
+
+                  {/* Tooltip when locked */}
+                  {locked ? (
+                    <div
+                      className={cx(
+                        "pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-2 z-[60]",
+                        "w-[270px] rounded-xl border border-zinc-200/80 bg-white px-3 py-2",
+                        "text-[11px] leading-snug text-zinc-700",
+                        "shadow-[0_10px_30px_rgba(0,0,0,0.12)]",
+                        "opacity-0 translate-y-1 scale-[0.98]",
+                        "group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100",
+                        "transition-none"
+                      )}
+                    >
+                      <div className="font-semibold text-zinc-900">Locked</div>
+
+                      <div className="mt-1 text-zinc-600">
+                        Finish{" "}
+                        <span className="font-medium text-zinc-800">Requirements</span> first to
+                        unlock this sheet.
+                      </div>
+
+                      <div className="mt-1 text-zinc-600">
+                        <span className="font-medium text-zinc-800">Dev option:</span> click{" "}
+                        <span className="font-medium text-zinc-800">“List view”</span> inside{" "}
+                        <span className="font-medium text-zinc-800">Requirements</span> to unlock
+                        early.
+                      </div>
+
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 bg-white border-l border-t border-zinc-200/80" />
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -221,7 +228,7 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
           />
         </div>
 
-        {/* 🔔 Change notice (active card + toast history) */}
+        {/* 🔔 Change notice */}
         <div className="relative">
           <button
             onClick={() => {
@@ -244,8 +251,7 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
             ) : null}
           </button>
 
-          {/* ✅ Active notice card (ONLY ONE, with X close)
-              Appears even when dropdown closed. */}
+          {/* Active notice card */}
           {activeNotice && !toastOpen ? (
             <div
               className={cx(
@@ -259,88 +265,61 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
                   <Bell size={16} strokeWidth={1.8} className="text-zinc-700" />
                 </div>
 
-                {/* ✅ Skeleton while AI is analyzing */}
-                {activeBusy ? (
-                  <ActiveNoticeSkeleton
-                    requestedBy={activeNotice.requestedBy}
-                    timestamp={activeNotice.timestamp}
-                  />
-                ) : (
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
-                          Change notice • {activeNotice.reqId}
-                        </div>
-                        <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
-                          {activeNotice.summary}
-                        </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
+                        Change notice • {activeNotice.reqId}
                       </div>
 
-                      <button
-                        onClick={dismissActiveNotice}
-                        className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
-                        aria-label="Close"
-                        title="Close"
-                      >
-                        <X size={16} strokeWidth={1.8} className="text-zinc-600" />
-                      </button>
+                      <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
+                        {activeNotice.summary}
+                      </div>
                     </div>
 
-                    <div className="mt-2 flex items-center gap-2">
-                      <Pill>{activeNotice.requestedBy}</Pill>
-                      <Pill>{activeNotice.timestamp}</Pill>
+                    <button
+                      onClick={dismissActiveNotice}
+                      className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
+                      aria-label="Close"
+                      title="Close"
+                    >
+                      <X size={16} strokeWidth={1.8} className="text-zinc-600" />
+                    </button>
+                  </div>
 
+                  <div className="mt-2 flex items-center gap-2">
+                    <Pill>{activeNotice.requestedBy}</Pill>
+                    <Pill>{activeNotice.timestamp}</Pill>
+
+                    {activeBusy ? (
+                      <Pill tone="busy">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Loader2 size={12} strokeWidth={2} className="animate-spin" />
+                          AI analyzing…
+                        </span>
+                      </Pill>
+                    ) : (
                       <Pill tone="good">
                         <span className="inline-flex items-center gap-1.5">
                           <CheckCircle2 size={12} strokeWidth={2} />
                           Done
                         </span>
                       </Pill>
-                    </div>
-
-                    <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
-                      <div className="text-[11px] text-zinc-500">Impact</div>
-                      <div className="mt-1 text-[13px] text-zinc-800">
-                        {activeNotice.impact}
-                      </div>
-                    </div>
+                    )}
                   </div>
-                )}
 
-                {/* ✅ If busy, still show close X (optional)
-                    If you want the X even while analyzing, move it outside skeleton */}
-                {activeBusy ? (
-                  <button
-                    onClick={dismissActiveNotice}
-                    className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
-                    aria-label="Close"
-                    title="Close"
-                  >
-                    <X size={16} strokeWidth={1.8} className="text-zinc-600" />
-                  </button>
-                ) : null}
-              </div>
-
-              {/* ✅ Keep the busy pill visible under skeleton */}
-              {activeBusy ? (
-                <div className="px-4 pb-3 -mt-1">
-                  <div className="flex items-center gap-2">
-                    <Pill>{activeNotice.requestedBy}</Pill>
-                    <Pill>{activeNotice.timestamp}</Pill>
-                    <Pill tone="busy">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Loader2 size={12} strokeWidth={2} className="animate-spin" />
-                        AI analyzing…
-                      </span>
-                    </Pill>
+                  <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
+                    <div className="text-[11px] text-zinc-500">Impact</div>
+                    <div className="mt-1 text-[13px] text-zinc-800">{activeNotice.impact}</div>
                   </div>
+
+                  <AiAnalysisBlock busy={activeBusy} />
                 </div>
-              ) : null}
+              </div>
             </div>
           ) : null}
 
-          {/* Dropdown history */}
+          {/* Dropdown history (unchanged) */}
           {toastOpen ? (
             <div
               className={cx(
@@ -382,7 +361,6 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
                           {n.reqId} • change notice
                         </div>
 
-                        {/* ✅ Skeleton for summary while analyzing */}
                         {busy ? (
                           <div className="mt-1.5 space-y-2 animate-pulse">
                             <SkeletonLine w="w-[92%]" />
