@@ -12,13 +12,59 @@ function Pill({ tone = "neutral", children }) {
     tone === "good"
       ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
       : tone === "busy"
-      ? "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700"
-      : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
+        ? "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700"
+        : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
 
   return (
     <span className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}>
       {children}
     </span>
+  );
+}
+
+/** Small skeleton helpers */
+function SkeletonLine({ w = "w-full" }) {
+  return <div className={cx("h-3 rounded-md bg-zinc-200/80", w)} />;
+}
+
+function SkeletonPill({ w = "w-20" }) {
+  return <div className={cx("h-6 rounded-full bg-zinc-200/80", w)} />;
+}
+
+function ActiveNoticeSkeleton({ requestedBy, timestamp }) {
+  return (
+    <div className="min-w-0 flex-1 animate-pulse">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="h-4 w-44 bg-zinc-200/80 rounded-md" />
+          <div className="mt-2 space-y-2">
+            <SkeletonLine w="w-[92%]" />
+            <SkeletonLine w="w-[78%]" />
+          </div>
+        </div>
+
+        <div className="h-8 w-8 rounded-xl bg-zinc-200/80" />
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <SkeletonPill w="w-24" />
+        <SkeletonPill w="w-20" />
+        <SkeletonPill w="w-28" />
+      </div>
+
+      <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
+        <div className="h-3 w-16 bg-zinc-200/80 rounded-md" />
+        <div className="mt-2 space-y-2">
+          <SkeletonLine w="w-[86%]" />
+          <SkeletonLine w="w-[64%]" />
+        </div>
+      </div>
+
+      {/* optional: keep real pills if you want, but skeletons already cover */}
+      <div className="sr-only">
+        {requestedBy} {timestamp}
+      </div>
+    </div>
   );
 }
 
@@ -119,17 +165,41 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
 
             {tabs.map((t) => {
               const isActive = t.id === activeTab;
+
+              // ✅ TODO: replace this with your real state from Context
+              // Example: const { requirementsComplete } = useDFMEA();
+              const requirementsComplete = false;
+
+              // ✅ Lock everything except Requirements when it's not complete
+              const isRequirementsTab = t.id === "requirements";
+              const locked = !requirementsComplete && !isRequirementsTab;
+
+              const lockedTooltip =
+                "Locked — finish Requirements first to unlock this sheet. Dev option: open Requirements → “List view” to unlock early.";
+
               return (
                 <button
                   key={t.id}
                   ref={(node) => {
                     if (node) tabRefs.current[t.id] = node;
                   }}
-                  onClick={() => onChangeTab(t.id)}
+                  disabled={locked}
+                  aria-disabled={locked}
+                  title={locked ? lockedTooltip : undefined}
+                  onClick={() => {
+                    if (locked) return;        // ✅ prevents click
+                    onChangeTab(t.id);
+                  }}
                   className={cx(
                     "relative z-10 text-[13px] px-3 py-1.5 rounded-lg",
                     "font-medium tracking-tight transition-colors duration-200",
-                    isActive ? "text-white" : "text-zinc-700 hover:text-zinc-900"
+                    isActive ? "text-white" : "text-zinc-700",
+
+                    // ✅ normal hover only when unlocked
+                    !locked && !isActive ? "hover:text-zinc-900" : "",
+
+                    // ✅ locked styling (makes it VERY obvious)
+                    locked ? "opacity-45 cursor-not-allowed" : "cursor-pointer"
                   )}
                 >
                   {t.label}
@@ -189,56 +259,84 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
                   <Bell size={16} strokeWidth={1.8} className="text-zinc-700" />
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
-                        Change notice • {activeNotice.reqId}
+                {/* ✅ Skeleton while AI is analyzing */}
+                {activeBusy ? (
+                  <ActiveNoticeSkeleton
+                    requestedBy={activeNotice.requestedBy}
+                    timestamp={activeNotice.timestamp}
+                  />
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
+                          Change notice • {activeNotice.reqId}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
+                          {activeNotice.summary}
+                        </div>
                       </div>
-                      <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
-                        {activeNotice.summary}
-                      </div>
+
+                      <button
+                        onClick={dismissActiveNotice}
+                        className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
+                        aria-label="Close"
+                        title="Close"
+                      >
+                        <X size={16} strokeWidth={1.8} className="text-zinc-600" />
+                      </button>
                     </div>
 
-                    <button
-                      onClick={dismissActiveNotice}
-                      className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
-                      aria-label="Close"
-                      title="Close"
-                    >
-                      <X size={16} strokeWidth={1.8} className="text-zinc-600" />
-                    </button>
-                  </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Pill>{activeNotice.requestedBy}</Pill>
+                      <Pill>{activeNotice.timestamp}</Pill>
 
-                  <div className="mt-2 flex items-center gap-2">
-                    <Pill>{activeNotice.requestedBy}</Pill>
-                    <Pill>{activeNotice.timestamp}</Pill>
-
-                    {activeBusy ? (
-                      <Pill tone="busy">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Loader2 size={12} strokeWidth={2} className="animate-spin" />
-                          AI analyzing…
-                        </span>
-                      </Pill>
-                    ) : (
                       <Pill tone="good">
                         <span className="inline-flex items-center gap-1.5">
                           <CheckCircle2 size={12} strokeWidth={2} />
                           Done
                         </span>
                       </Pill>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
-                    <div className="text-[11px] text-zinc-500">Impact</div>
-                    <div className="mt-1 text-[13px] text-zinc-800">
-                      {activeNotice.impact}
+                    <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
+                      <div className="text-[11px] text-zinc-500">Impact</div>
+                      <div className="mt-1 text-[13px] text-zinc-800">
+                        {activeNotice.impact}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* ✅ If busy, still show close X (optional)
+                    If you want the X even while analyzing, move it outside skeleton */}
+                {activeBusy ? (
+                  <button
+                    onClick={dismissActiveNotice}
+                    className="h-8 w-8 rounded-xl grid place-items-center hover:bg-zinc-100 transition-colors"
+                    aria-label="Close"
+                    title="Close"
+                  >
+                    <X size={16} strokeWidth={1.8} className="text-zinc-600" />
+                  </button>
+                ) : null}
               </div>
+
+              {/* ✅ Keep the busy pill visible under skeleton */}
+              {activeBusy ? (
+                <div className="px-4 pb-3 -mt-1">
+                  <div className="flex items-center gap-2">
+                    <Pill>{activeNotice.requestedBy}</Pill>
+                    <Pill>{activeNotice.timestamp}</Pill>
+                    <Pill tone="busy">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 size={12} strokeWidth={2} className="animate-spin" />
+                        AI analyzing…
+                      </span>
+                    </Pill>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -283,9 +381,18 @@ export default function TopNav({ tabs, activeTab, onChangeTab }) {
                         <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
                           {n.reqId} • change notice
                         </div>
-                        <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
-                          {n.summary}
-                        </div>
+
+                        {/* ✅ Skeleton for summary while analyzing */}
+                        {busy ? (
+                          <div className="mt-1.5 space-y-2 animate-pulse">
+                            <SkeletonLine w="w-[92%]" />
+                            <SkeletonLine w="w-[78%]" />
+                          </div>
+                        ) : (
+                          <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight line-clamp-2">
+                            {n.summary}
+                          </div>
+                        )}
 
                         <div className="mt-2 flex items-center gap-2">
                           <Pill>{n.requestedBy}</Pill>
