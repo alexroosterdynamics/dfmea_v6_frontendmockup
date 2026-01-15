@@ -1,0 +1,318 @@
+{
+  "tabId": "workflows",
+  "title": "Workflows",
+  "meta": {
+    "visibility": "Team space",
+    "edited": "Edited 3m ago"
+  },
+  "tasksTitle": "Workflow Tasks",
+  "tasks": [
+    {
+      "id": "wf-task-1",
+      "label": "Review Design Workflow template",
+      "done": true
+    },
+    {
+      "id": "wf-task-2",
+      "label": "Create Validation SOP draft",
+      "done": false
+    },
+    {
+      "id": "wf-task-3",
+      "label": "Add DFMEA gates to approvals",
+      "done": false
+    }
+  ],
+  "assistant": {
+    "welcome": "Welcome to Workflows. These are SOP-style diagrams your team uses to standardize DFMEA execution.",
+    "suggestedPrompts": [
+      "Summarize this workflow as a checklist",
+      "Where should DFMEA gates be added?",
+      "Suggest improvements for robustness",
+      "Generate a validation workflow draft"
+    ]
+  },
+  "content": {
+    "workflows": [
+      {
+        "id": "wf-design-001",
+        "category": "design",
+        "owner": "team",
+        "title": "Design Workflow • DFMEA-driven design release",
+        "summary": "Standard design workflow forcing DFMEA review before release, including requirements, linking, and sign-off.",
+        "textSteps": [
+          "Start",
+          "Confirm product intent and boundaries",
+          "Review requirements completeness and flags",
+          "Map requirements → systems → functions",
+          "Run DFMEA workshop and log critical items",
+          "Assign actions and owners",
+          "Design review gate",
+          "If changes requested → revise and loop back",
+          "If approved → freeze baseline and export"
+        ],
+        "diagram": {
+          "grid": 20,
+          "zoom": 0.763,
+          "nodes": [
+            {
+              "id": "d0",
+              "type": "start",
+              "x": -120,
+              "y": -40,
+              "w": 200,
+              "h": 70,
+              "title": "Start",
+              "detail": "Kick off DFMEA-driven release"
+            },
+            {
+              "id": "d1",
+              "x": 180,
+              "y": -40,
+              "w": 240,
+              "h": 80,
+              "title": "Input Requirements",
+              "detail": "Confirm requirement set + boundaries"
+            },
+            {
+              "id": "d2",
+              "x": 560,
+              "y": -40,
+              "w": 260,
+              "h": 80,
+              "title": "Map Systems & Functions",
+              "detail": "Link requirements → systems → functions"
+            },
+            {
+              "id": "d3",
+              "x": 980,
+              "y": -40,
+              "w": 230,
+              "h": 80,
+              "title": "DFMEA Workshop",
+              "detail": "Identify failure modes + risks"
+            },
+            {
+              "id": "d4",
+              "x": 980,
+              "y": 240,
+              "w": 230,
+              "h": 80,
+              "title": "Assign Actions",
+              "detail": "Owners • due dates • verification"
+            },
+            {
+              "id": "d5",
+              "x": 620,
+              "y": 500,
+              "w": 260,
+              "h": 80,
+              "title": "Design Review Gate",
+              "detail": "Approval requires clean DFMEA"
+            },
+            {
+              "id": "d7",
+              "x": 460,
+              "y": 240,
+              "w": 240,
+              "h": 80,
+              "title": "Revise Design",
+              "detail": "Address review feedback / gaps"
+            },
+            {
+              "id": "d6",
+              "type": "end",
+              "x": 40,
+              "y": 500,
+              "w": 240,
+              "h": 80,
+              "title": "Release Baseline",
+              "detail": "Freeze DFMEA + export package"
+            }
+          ],
+          "edges": [
+            {
+              "id": "de0",
+              "from": "d0",
+              "to": "d1",
+              "label": "begin"
+            },
+            {
+              "id": "de1",
+              "from": "d1",
+              "to": "d2",
+              "label": "requirements mapped"
+            },
+            {
+              "id": "de2",
+              "from": "d2",
+              "to": "d3",
+              "label": "structure ready"
+            },
+            {
+              "id": "de3",
+              "from": "d3",
+              "to": "d4",
+              "label": "risks found"
+            },
+            {
+              "id": "de4",
+              "from": "d4",
+              "to": "d5",
+              "label": "actions assigned"
+            },
+            {
+              "id": "de5",
+              "from": "d5",
+              "to": "d6",
+              "label": "approved → release"
+            },
+            {
+              "id": "de6",
+              "from": "d5",
+              "to": "d7",
+              "label": "changes requested"
+            },
+            {
+              "id": "de7",
+              "from": "d7",
+              "to": "d2",
+              "label": "loop back"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wf-validation-001",
+        "category": "validation",
+        "owner": "team",
+        "title": "Validation Workflow • DVP&R planning + closure",
+        "summary": "Validation SOP used to convert DFMEA risks into test coverage and closure evidence.",
+        "textSteps": [
+          "Start",
+          "Extract DFMEA risks",
+          "Define measurable validation objectives",
+          "Build DVP&R plan and acceptance criteria",
+          "Execute tests and capture evidence",
+          "If fail → analyze + revise objectives",
+          "If pass → close actions + publish report"
+        ],
+        "diagram": {
+          "grid": 20,
+          "zoom": 1,
+          "nodes": [
+            {
+              "id": "v0",
+              "type": "start",
+              "x": 80,
+              "y": 80,
+              "w": 200,
+              "h": 70,
+              "title": "Start",
+              "detail": "Begin validation planning"
+            },
+            {
+              "id": "v1",
+              "x": 340,
+              "y": 80,
+              "w": 270,
+              "h": 80,
+              "title": "Extract DFMEA Risks",
+              "detail": "Top RPN / critical modes"
+            },
+            {
+              "id": "v2",
+              "x": 670,
+              "y": 80,
+              "w": 300,
+              "h": 80,
+              "title": "Define Test Objectives",
+              "detail": "Translate to measurable outcomes"
+            },
+            {
+              "id": "v3",
+              "x": 1030,
+              "y": 80,
+              "w": 250,
+              "h": 80,
+              "title": "Build DVP&R Plan",
+              "detail": "Tests + acceptance criteria"
+            },
+            {
+              "id": "v4",
+              "x": 1030,
+              "y": 240,
+              "w": 250,
+              "h": 80,
+              "title": "Execute Tests",
+              "detail": "Capture evidence"
+            },
+            {
+              "id": "v5",
+              "x": 670,
+              "y": 240,
+              "w": 300,
+              "h": 80,
+              "title": "Analyze Failures",
+              "detail": "Root cause & corrective actions"
+            },
+            {
+              "id": "v6",
+              "type": "end",
+              "x": 340,
+              "y": 240,
+              "w": 270,
+              "h": 80,
+              "title": "Close + Report",
+              "detail": "Update DFMEA + publish report"
+            }
+          ],
+          "edges": [
+            {
+              "id": "ve0",
+              "from": "v0",
+              "to": "v1",
+              "label": "begin"
+            },
+            {
+              "id": "ve1",
+              "from": "v1",
+              "to": "v2",
+              "label": "risk intake"
+            },
+            {
+              "id": "ve2",
+              "from": "v2",
+              "to": "v3",
+              "label": "test intent"
+            },
+            {
+              "id": "ve3",
+              "from": "v3",
+              "to": "v4",
+              "label": "plan approved"
+            },
+            {
+              "id": "ve4",
+              "from": "v4",
+              "to": "v5",
+              "label": "fail → analyze"
+            },
+            {
+              "id": "ve5",
+              "from": "v5",
+              "to": "v2",
+              "label": "revise objectives"
+            },
+            {
+              "id": "ve6",
+              "from": "v4",
+              "to": "v6",
+              "label": "pass → closure"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

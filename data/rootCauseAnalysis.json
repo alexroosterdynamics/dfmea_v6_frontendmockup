@@ -1,0 +1,61 @@
+{
+  "tabId": "rootCauseAnalysis",
+  "title": "Root Cause Analysis",
+  "meta": { "visibility": "Private", "edited": "Edited 2m ago" },
+  "tasksTitle": "Root cause analysis tasks",
+  "tasks": [
+    { "id": "c1", "label": "Select top risk item (highest RPN)", "done": true },
+    { "id": "c2", "label": "Draft 5-Whys chain", "done": false },
+    { "id": "c3", "label": "Identify contributing categories", "done": false },
+    { "id": "c4", "label": "Propose corrective / preventive actions", "done": false },
+    { "id": "c5", "label": "Update DFMEA controls + verification plan", "done": false }
+  ],
+  "content": {
+    "focusItem": {
+      "failureMode": "Leakage above spec at end-of-line test",
+      "effect": "Performance degradation, customer returns",
+      "currentControls": ["EOL leak test", "Visual inspection of seal seating"]
+    },
+    "categories": [
+      {
+        "name": "Man (People)",
+        "items": ["Inconsistent torque application", "Missed seal lubrication step"]
+      },
+      {
+        "name": "Machine (Equipment)",
+        "items": ["Worn torque tool clutch", "Test fixture seal damaged"]
+      },
+      {
+        "name": "Method (Process)",
+        "items": ["No poka-yoke for seal orientation", "Cleaning step skipped under time pressure"]
+      },
+      {
+        "name": "Material",
+        "items": ["Seal batch variation", "Surface finish out of spec on mating part"]
+      },
+      {
+        "name": "Measurement",
+        "items": ["Leak test calibration overdue", "Incorrect test pressure setting"]
+      },
+      {
+        "name": "Environment",
+        "items": ["Dust contamination", "Temperature affecting seal compression"]
+      }
+    ],
+    "fiveWhys": [
+      { "why": 1, "text": "Why is leakage above spec? → Seal not seated correctly." },
+      { "why": 2, "text": "Why not seated correctly? → Seal orientation occasionally reversed." },
+      { "why": 3, "text": "Why reversed? → No visual cue / poka-yoke in assembly step." },
+      { "why": 4, "text": "Why no poka-yoke? → Design did not include asymmetric feature." },
+      { "why": 5, "text": "Why not included? → Requirement for assembly error-proofing not captured." }
+    ]
+  },
+  "assistant": {
+    "welcome": "I can help generate a fishbone, expand 5-Whys, and translate outcomes into DFMEA actions + controls.",
+    "suggestedPrompts": [
+      "Turn the 5-Whys into DFMEA recommended actions.",
+      "Suggest detection and prevention controls for seal orientation.",
+      "What verification tests prove the corrective action worked?"
+    ]
+  }
+}

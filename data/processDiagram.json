@@ -1,0 +1,31 @@
+{
+  "tabId": "processDiagram",
+  "title": "Process Diagram",
+  "meta": { "visibility": "Private", "edited": "Edited 5m ago" },
+  "tasksTitle": "Process diagram tasks",
+  "tasks": [
+    { "id": "p1", "label": "Define start/end boundaries", "done": true },
+    { "id": "p2", "label": "Add major process steps", "done": true },
+    { "id": "p3", "label": "Assign step owners", "done": false },
+    { "id": "p4", "label": "Identify inputs/outputs per step", "done": false },
+    { "id": "p5", "label": "Mark critical characteristics", "done": false }
+  ],
+  "content": {
+    "note": "Mock process flow for DFMEA context. Replace with your real manufacturing/engineering process.",
+    "steps": [
+      { "id": "S1", "title": "Receive Parts", "subtitle": "Incoming inspection + traceability" },
+      { "id": "S2", "title": "Prep & Clean", "subtitle": "Deburr + solvent clean" },
+      { "id": "S3", "title": "Assemble", "subtitle": "Torque fasteners + fit seals" },
+      { "id": "S4", "title": "Functional Test", "subtitle": "Leak + pressure stability test" },
+      { "id": "S5", "title": "Pack & Ship", "subtitle": "Label + protective packaging" }
+    ]
+  },
+  "assistant": {
+    "welcome": "I can help turn your process into DFMEA-friendly functions, identify failure points per step, and suggest controls.",
+    "suggestedPrompts": [
+      "For each step, list likely failure modes and effects.",
+      "Suggest inputs/outputs for steps S2–S4.",
+      "Where should we add detection controls in this flow?"
+    ]
+  }
+}

@@ -1,0 +1,497 @@
+{
+  "tabId": "requirements",
+  "title": "Requirements",
+  "meta": { "visibility": "Private", "edited": "Edited 1m ago" },
+  "tasksTitle": "Requirements tasks",
+  "tasks": [
+    { "id": "r1", "label": "Capture customer requirements", "done": true },
+    { "id": "r2", "label": "Add regulatory constraints", "done": false },
+    { "id": "r3", "label": "Define measurable acceptance criteria", "done": false },
+    { "id": "r4", "label": "Map requirements to functions", "done": false },
+    { "id": "r5", "label": "Review for completeness / ambiguity", "done": false }
+  ],
+  "content": {
+    "projectName": "Wireless Headphones",
+    "introChecklist": [
+      "Create a baseline requirement set for DFMEA.",
+      "Keep each requirement measurable, testable, and traceable.",
+      "Capture operating conditions and acceptance criteria for every key function."
+    ],
+    "changeNotices": [
+      {
+        "noticeId": "CN-001",
+        "reqId": "REQ-003",
+        "summary": "Customer requests higher maximum volume without distortion.",
+        "impact": "Potential impact on amplifier headroom, thermal limits, and power draw. Verify safe operation and sound quality targets.",
+        "requestedBy": "Customer Change Control",
+        "timestamp": "2m ago"
+      },
+      {
+        "noticeId": "CN-002",
+        "reqId": "REQ-006",
+        "summary": "Regulatory team requests updated charging behavior under fault conditions.",
+        "impact": "May require additional firmware safety states and stricter detection for over-current/over-temp.",
+        "requestedBy": "Compliance",
+        "timestamp": "1m ago"
+      },
+      {
+        "noticeId": "CN-003",
+        "reqId": "REQ-009",
+        "summary": "Mechanical team requests tighter tolerance on hinge click feel.",
+        "impact": "May increase assembly sensitivity and require new incoming inspection limits for mating parts.",
+        "requestedBy": "ME Lead",
+        "timestamp": "Just now"
+      }
+    ],
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "text": "Battery runtime shall be ≥ 5.0 hours at 50% volume, SBC codec, and 20°C ambient, using a 1 kHz test tone sequence per internal audio test method.",
+        "source": "Customer Spec",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Elena Popescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["battery_runtime_test_plan.pdf"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Targets are measurable and tied to a repeatable test method and operating conditions.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-002",
+        "text": "Maximum continuous playback SPL shall be 95 dB SPL ±2 dB at 1 kHz (A-weighted), measured in an IEC 60318-4 coupler with ANC off.",
+        "source": "Internal Standard",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Radu Ionescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["acoustic_test_setup.docx"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Includes numeric target, unit, test environment, and configuration constraints.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-003",
+        "text": "Headphones should sound good.",
+        "source": "Marketing",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Project Manager",
+        "ownerName": "Mihai Dumitrescu",
+        "domainCategory": "Software",
+        "reqType": "Non-functional",
+        "flagged": true,
+        "aiAdvice": "Define measurable sound quality metrics: frequency response target window, THD limits (e.g., <1% at 1 kHz), channel balance, and a listening test protocol with pass/fail criteria.",
+        "files": [],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Subjective wording without measurable acceptance criteria increases interpretation risk across teams.",
+          "lastRun": "16m ago"
+        }
+      },
+      {
+        "id": "REQ-004",
+        "text": "Bluetooth connection shall maintain < 150 ms one-way latency in video mode at 3 m distance with line-of-sight, measured on reference phone model list.",
+        "source": "Customer Spec",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Andrei Marinescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["latency_test_matrix.xlsx"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Measurable latency threshold with distance and environment constraints supports clear verification.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-005",
+        "text": "Device shall not exceed 42°C external surface temperature after 60 minutes playback at 25°C ambient, measured at the earcup hotspot locations.",
+        "source": "Internal Standard",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Mechanical Engineer",
+        "ownerName": "Ioana Stan",
+        "domainCategory": "Mechanical",
+        "reqType": "Non-functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["thermal_hotspot_map.png"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Defines a numeric limit, duration, ambient conditions, and measurement location.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-006",
+        "text": "Charging shall stop safely if something goes wrong.",
+        "source": "Regulatory / Safety",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Vlad Georgescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Specify detectable fault conditions (over-current, over-voltage, over-temperature), threshold values, and required system response (disable charge FET within X ms, log event, user indication).",
+        "files": ["charging_state_machine_sketch.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Missing defined fault thresholds, reaction time, and explicit safety behavior requirements.",
+          "lastRun": "16m ago"
+        }
+      },
+      {
+        "id": "REQ-007",
+        "text": "USB-C charging input shall accept 5 V ±5% and limit inrush current to < 800 mA, measured at the port during plug-in at 20°C.",
+        "source": "Electrical Design Spec",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Elena Popescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["usbc_inrush_scope_capture.png"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Numeric thresholds with units and measurement conditions are clear and testable.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-008",
+        "text": "Hinge shall survive ≥ 10,000 open/close cycles with no functional degradation, tested at 1 Hz at 23°C.",
+        "source": "Mechanical Validation Plan",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Mechanical Engineer",
+        "ownerName": "Ioana Stan",
+        "domainCategory": "Mechanical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["hinge_cycle_test_fixture.step"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Durability count, conditions, and test pacing clearly support verification.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-009",
+        "text": "Fit and finish should be premium.",
+        "source": "Industrial Design",
+        "priority": "Low",
+        "status": "Draft",
+        "ownerRole": "Project Manager",
+        "ownerName": "Mihai Dumitrescu",
+        "domainCategory": "Mechanical",
+        "reqType": "Non-functional",
+        "flagged": true,
+        "aiAdvice": "Define measurable cosmetic criteria (scratch resistance, gap/flush tolerances, acceptable defect catalog) and an inspection sampling plan with pass/fail thresholds.",
+        "files": ["cosmetic_defect_catalog.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Subjective quality wording without measurable acceptance criteria leads to inconsistent inspection outcomes.",
+          "lastRun": "16m ago"
+        }
+      },
+      {
+        "id": "REQ-010",
+        "text": "Firmware shall recover from Bluetooth disconnection within 3.0 seconds and re-establish audio streaming without user intervention under normal operating conditions.",
+        "source": "Software Spec",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Andrei Marinescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["reconnect_test_script.py"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Explicit recovery time and expected autonomous behavior create a verifiable software requirement.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-011",
+        "text": "Maximum continuous playback SPL shall be ≥ 98 dB SPL at 1 kHz (A-weighted) with THD+N ≤ 1.0%, measured in an IEC 60318-4 coupler with ANC off at 23°C ambient.",
+        "source": "Customer Change Control",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Radu Ionescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["max_spl_thd_test_method.pdf"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Defines SPL target and distortion limit with test fixture, configuration, and ambient conditions for verification.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-012",
+        "text": "Charging firmware shall disable charging within 200 ms when any fault is detected: input over-voltage > 5.5 V for ≥ 10 ms, charge current > 1.2 A for ≥ 20 ms, or battery temperature > 45°C for ≥ 5 s, and shall log a fault code and illuminate a fault indication within 1.0 s.",
+        "source": "Compliance",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Vlad Georgescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["charging_fault_thresholds.xlsx"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Fault thresholds, timing, and required responses are explicit and directly testable in system validation.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-013",
+        "text": "Hinge detent torque at the primary open position shall be 0.25 N·m to 0.35 N·m, measured at 23°C using a torque gauge at 10°/s, and the click repeatability shall be within ±10% over 5 consecutive actuations.",
+        "source": "ME Lead",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Mechanical Engineer",
+        "ownerName": "Ioana Stan",
+        "domainCategory": "Mechanical",
+        "reqType": "Functional",
+        "flagged": false,
+        "aiAdvice": "",
+        "files": ["hinge_detent_torque_test.docx"],
+        "details": "",
+        "isComplete": true,
+        "risk": {
+          "status": "good",
+          "title": "Low ambiguity • traceable",
+          "reasoning": "Defines numeric torque window, measurement method, and repeatability requirement to control subjective 'click feel'.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-014",
+        "text": "Noise cancelling should be strong.",
+        "source": "Customer Spec",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Radu Ionescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Define ANC attenuation targets at specific frequencies (e.g., ≥ 20 dB at 100 Hz) and the measurement setup (artificial ear, noise field, stimulus SPL) with clear pass/fail criteria.",
+        "files": ["anc_attenuation_test_plan.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Subjective wording without quantified attenuation targets and test conditions prevents consistent verification across labs.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-015",
+        "text": "Call quality should be clear in noisy places.",
+        "source": "Internal Standard",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Electrical Engineer",
+        "ownerName": "Elena Popescu",
+        "domainCategory": "Electrical",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Specify measurable uplink metrics such as POLQA/MOS target, background noise level (dB SPL), SNR, and a defined test box or head-and-torso simulator method with pass/fail thresholds.",
+        "files": ["mic_characterization_method.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "No numeric performance target, noise profile, or test method defined, leading to inconsistent 'clear' interpretation.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-016",
+        "text": "Headphones should be water resistant.",
+        "source": "Regulatory / Safety",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Mechanical Engineer",
+        "ownerName": "Ioana Stan",
+        "domainCategory": "Mechanical",
+        "reqType": "Non-functional",
+        "flagged": true,
+        "aiAdvice": "Define the target ingress rating (e.g., IPX4) and verification steps (standard method, exposure duration, post-test functional checks) with explicit pass/fail criteria.",
+        "files": ["ipx4_test_procedure.docx"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Water resistance is undefined without an IP rating, test method, and acceptance criteria for post-exposure functionality.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-017",
+        "text": "Headphones shall be durable for daily use.",
+        "source": "Mechanical Validation Plan",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Mechanical Engineer",
+        "ownerName": "Ioana Stan",
+        "domainCategory": "Mechanical",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Convert to measurable durability tests such as drop height/count/orientations, vibration profile, and required post-test functional checks (audio, BT, charging) with clear limits.",
+        "files": ["drop_test_plan.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "‘Durable’ is subjective and lacks quantified mechanical stress conditions and explicit post-test pass/fail criteria.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-018",
+        "text": "Product should comply with electromagnetic compatibility requirements.",
+        "source": "Regulatory / Safety",
+        "priority": "High",
+        "status": "Draft",
+        "ownerRole": "Project Manager",
+        "ownerName": "Mihai Dumitrescu",
+        "domainCategory": "Electrical",
+        "reqType": "Non-functional",
+        "flagged": true,
+        "aiAdvice": "Specify compliance standards, class limits (e.g., Class B), and immunity levels (e.g., ESD contact/air kV) along with what constitutes pass/fail (no reset, recoverable glitch, etc.).",
+        "files": ["emc_esd_compliance_plan.pdf"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "References compliance broadly without defining standards, numeric limits, test levels, or acceptable functional impact criteria.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-019",
+        "text": "Firmware updates should be reliable and safe.",
+        "source": "Software Spec",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Andrei Marinescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Define update success rate target (e.g., ≥ 99%), test conditions (packet loss, distance), maximum update time, rollback behavior, and integrity verification steps with pass/fail criteria.",
+        "files": ["ota_update_reliability_test.docx"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "Does not include measurable reliability metrics, stress conditions, or explicit recovery/rollback timing requirements.",
+          "lastRun": "Just now"
+        }
+      },
+      {
+        "id": "REQ-020",
+        "text": "Pairing should be fast and easy.",
+        "source": "Customer Spec",
+        "priority": "Medium",
+        "status": "Draft",
+        "ownerRole": "Software Engineer",
+        "ownerName": "Andrei Marinescu",
+        "domainCategory": "Software",
+        "reqType": "Functional",
+        "flagged": true,
+        "aiAdvice": "Define pairing completion time (seconds), distance, environment constraints, reference phone list, and what qualifies as success (connected + audio route) with a repeatable test script.",
+        "files": ["pairing_time_test_script.py"],
+        "details": "",
+        "isComplete": false,
+        "risk": {
+          "status": "bad",
+          "title": "High ambiguity • risk flagged",
+          "reasoning": "‘Fast and easy’ is subjective without a defined time limit, success criteria, and test conditions for repeatable verification.",
+          "lastRun": "Just now"
+        }
+      }
+    ]
+  },
+  "assistant": {
+    "welcome": "I can help rewrite requirements to be testable, identify missing constraints, and draft acceptance criteria.",
+    "suggestedPrompts": [
+      "Rewrite vague requirements to be measurable and testable.",
+      "What requirements are missing for robustness and safety?",
+      "Create acceptance criteria for sound quality and charging safety."
+    ]
+  }
+}

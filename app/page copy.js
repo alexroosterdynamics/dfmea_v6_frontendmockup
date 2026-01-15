@@ -14,7 +14,7 @@ import workflowsJson from "../data/workflows.json";
 import { DFMEAProvider } from "../contexts/Context";
 
 export default function Page() {
-  // ✅ Sheets in TopNav (Workflows intentionally NOT here)
+  // ✅ Removed "Workflows" from TopNav tabs (no sheet exposure)
   const tabs = useMemo(
     () => [
       { id: "requirements", label: "Requirements" },
@@ -26,9 +26,10 @@ export default function Page() {
 
   const [requirementsData, setRequirementsData] = useState(requirementsJson);
 
-  // ✅ Workflows state
+  // ✅ Make workflows stateful so Sidebar can create/select workflows
   const [workflowsData, setWorkflowsData] = useState(workflowsJson);
 
+  // ✅ Which workflow is selected (from sidebar)
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(
     workflowsJson?.content?.workflows?.[0]?.id ?? ""
   );
@@ -43,14 +44,12 @@ export default function Page() {
     [requirementsData, workflowsData]
   );
 
-  // ✅ Controls which viewport is shown
   const [activeTab, setActiveTab] = useState("requirements");
 
-  // ✅ Controls which TopNav "sheet" looks active
-  const [activeSheetTab, setActiveSheetTab] = useState("requirements");
-
-  // ✅ DEV gating
+  // ✅ DEV: override gating anytime
   const [devOverride, setDevOverride] = useState(false);
+
+  // ✅ QUICK DEV: once you click List view once, tabs become accessible
   const [listViewUnlocked, setListViewUnlocked] = useState(false);
 
   const requirementsUnlocked = useMemo(() => {
@@ -64,21 +63,18 @@ export default function Page() {
   const canAccessOtherTabs = requirementsUnlocked || devOverride || listViewUnlocked;
 
   function handleChangeTab(nextTabId) {
-    // ✅ Workflows is always accessible but does NOT change activeSheetTab
+    // ✅ Workflows accessible always
     if (nextTabId === "workflows") {
       setActiveTab("workflows");
       return;
     }
 
     if (nextTabId !== "requirements" && !canAccessOtherTabs) return;
-
     setActiveTab(nextTabId);
-    setActiveSheetTab(nextTabId); // ✅ only real sheets update TopNav indicator
   }
 
   function onDevJumpTo(tabId) {
     setActiveTab(tabId);
-    if (tabId !== "workflows") setActiveSheetTab(tabId);
   }
 
   function onUpdateRequirements(nextRequirementsArray) {
@@ -91,6 +87,7 @@ export default function Page() {
     }));
   }
 
+  // ✅ Add new workflow from sidebar (local mock create)
   function onCreateWorkflow() {
     const newId = `wf-my-${Math.random().toString(16).slice(2, 7)}`;
 
@@ -104,15 +101,14 @@ export default function Page() {
       diagram: {
         grid: 20,
         zoom: 1,
-        pan: { x: 80, y: 60 },
         nodes: [
           {
             id: "m0",
             type: "start",
             x: 80,
             y: 80,
-            w: 220,
-            h: 76,
+            w: 200,
+            h: 70,
             title: "Start",
             detail: "Kick off workflow"
           },
@@ -121,7 +117,7 @@ export default function Page() {
             type: "end",
             x: 420,
             y: 80,
-            w: 240,
+            w: 220,
             h: 80,
             title: "End",
             detail: "Close workflow"
@@ -140,7 +136,7 @@ export default function Page() {
     }));
 
     setSelectedWorkflowId(newId);
-    setActiveTab("workflows"); // ✅ open workflows viewport
+    setActiveTab("workflows");
   }
 
   return (
@@ -157,8 +153,7 @@ export default function Page() {
         </div>
 
         <div className="hidden lg:flex h-full flex-col overflow-hidden">
-          {/* ✅ TopNav should stay on the last real sheet */}
-          <TopNav tabs={tabs} activeTab={activeSheetTab} onChangeTab={handleChangeTab} />
+          <TopNav tabs={tabs} activeTab={activeTab} onChangeTab={handleChangeTab} />
 
           <div className="flex flex-1 overflow-hidden">
             <Sidebar
