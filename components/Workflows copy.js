@@ -11,7 +11,7 @@ import {
   useRef,
   useState
 } from "react";
-import { List, Workflow as WorkflowIcon, Save, Plus, Trash2 } from "lucide-react";
+import { List, Workflow as WorkflowIcon, Save, Plus } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
 import {
@@ -27,23 +27,6 @@ import {
 
 import { useDFMEA } from "@/contexts/Context";
 
-// ✅ visual-only design system
-import {
-  WF_GRID,
-  WF_CANVAS,
-  wfGetEdgeStroke,
-  wfNodeShellClass,
-  wfNodeLabelClass,
-  wfNodeDeleteBtnClass,
-  wfEdgeLabelPillClass,
-  wfNodeConnectionIcons,
-  wfNodeIconButtonClass,
-  wfDecisionDiamond,
-  wfConditionDiamond,
-  wfHintOverlayClass,
-  wfBackgroundGrid
-} from "@/lib/workflowVisuals";
-
 const cx = (...c) => c.filter(Boolean).join(" ");
 
 /* ============================== TYPES / CONSTANTS ============================== */
@@ -56,7 +39,12 @@ const CONNECTION_TYPES = {
   CONDITION: "condition"
 };
 
-const GRID = WF_GRID;
+const GRID = {
+  CELL_WIDTH: 180,
+  CELL_HEIGHT: 90,
+  NODE_WIDTH: 120,
+  NODE_HEIGHT: 40
+};
 
 const gridToPixel = (gridX, gridY) => ({
   x: gridX * GRID.CELL_WIDTH,
@@ -67,6 +55,15 @@ const pixelToGrid = (x, y) => ({
   gridX: Math.round((x ?? 0) / GRID.CELL_WIDTH),
   gridY: Math.round((y ?? 0) / GRID.CELL_HEIGHT)
 });
+
+const colorByType = {
+  [CONNECTION_TYPES.SERIES]: "#3b82f6",
+  [CONNECTION_TYPES.DECISION]: "#f59e0b",
+  [CONNECTION_TYPES.PARALLEL]: "#10b981",
+  [CONNECTION_TYPES.SUBSTEP]: "#8b5cf6",
+  [CONNECTION_TYPES.ROUTE]: "#f97316",
+  [CONNECTION_TYPES.CONDITION]: "#06b6d4"
+};
 
 function getHandlesForType(type) {
   switch (type) {
@@ -100,6 +97,44 @@ function ProcessNode({ id, data, selected }) {
     setEditValue(data.label);
   };
 
+  const icons = [
+    {
+      type: CONNECTION_TYPES.ROUTE,
+      symbol: "←",
+      label: "Route",
+      color: "#f97316",
+      className: "left-[-34px] top-1/2 -translate-y-1/2"
+    },
+    {
+      type: CONNECTION_TYPES.SERIES,
+      symbol: "→",
+      label: "Series",
+      color: "#3b82f6",
+      className: "right-[-34px] top-[35%] -translate-y-1/2"
+    },
+    {
+      type: CONNECTION_TYPES.CONDITION,
+      symbol: "◇",
+      label: "Condition",
+      color: "#06b6d4",
+      className: "right-[-34px] bottom-[-34px]"
+    },
+    {
+      type: CONNECTION_TYPES.SUBSTEP,
+      symbol: "↳",
+      label: "SubStep",
+      color: "#8b5cf6",
+      className: "left-[10px] bottom-[-34px]"
+    },
+    {
+      type: CONNECTION_TYPES.PARALLEL,
+      symbol: "⇊",
+      label: "Parallel",
+      color: "#10b981",
+      className: "left-1/2 bottom-[-34px] -translate-x-1/2"
+    }
+  ];
+
   return (
     <div className="group relative" style={{ width: GRID.NODE_WIDTH }}>
       {/* Hidden handles */}
@@ -118,7 +153,13 @@ function ProcessNode({ id, data, selected }) {
           e.stopPropagation();
           setIsEditing(true);
         }}
-        className={wfNodeShellClass({ selected })}
+        className={cx(
+          "relative h-10 w-[120px] rounded-xl border px-3 flex items-center justify-center",
+          "bg-zinc-950/70 text-zinc-100",
+          selected
+            ? "border-blue-400 shadow-[0_0_0_2px_rgba(59,130,246,0.30)]"
+            : "border-zinc-700"
+        )}
       >
         {isEditing ? (
           <input
@@ -134,7 +175,7 @@ function ProcessNode({ id, data, selected }) {
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className={wfNodeLabelClass}>{data.label}</span>
+          <span className="text-sm font-semibold">{data.label}</span>
         )}
 
         {!data.isStart && (
@@ -144,34 +185,36 @@ function ProcessNode({ id, data, selected }) {
               e.stopPropagation();
               data.onDeleteNode(id);
             }}
-            className={wfNodeDeleteBtnClass}
+            className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full
+                       bg-zinc-900/80 text-zinc-200 hover:bg-zinc-800 group-hover:flex"
           >
             ×
           </button>
         )}
 
-        {wfNodeConnectionIcons.map((ic) => {
-          const stroke = wfGetEdgeStroke(ic.type);
-
-          return (
-            <button
-              key={ic.type}
-              title={ic.label}
-              className={cx(wfNodeIconButtonClass(), ic.className)}
-              style={{
-                borderColor: stroke,
-                boxShadow: `0 0 0 1px ${stroke}33`
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                data.onAddConnection(id, ic.type);
-              }}
-            >
-              <span style={{ color: stroke }}>{ic.symbol}</span>
-            </button>
-          );
-        })}
+        {icons.map((ic) => (
+          <button
+            key={ic.type}
+            title={ic.label}
+            className={cx(
+              "absolute flex h-7 w-7 items-center justify-center rounded-full border",
+              "bg-zinc-950/80 text-sm font-semibold text-white shadow",
+              "opacity-0 scale-95 transition group-hover:opacity-100 group-hover:scale-100",
+              ic.className
+            )}
+            style={{
+              borderColor: ic.color,
+              boxShadow: `0 0 0 1px ${ic.color}33`
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              data.onAddConnection(id, ic.type);
+            }}
+          >
+            <span style={{ color: ic.color }}>{ic.symbol}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -179,7 +222,7 @@ function ProcessNode({ id, data, selected }) {
 
 /* ============================== EDGES ============================== */
 function SeriesEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.SERIES);
+  const stroke = colorByType[CONNECTION_TYPES.SERIES];
   return (
     <path
       id={id}
@@ -193,22 +236,29 @@ function SeriesEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd }) {
 }
 
 function RouteEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.ROUTE);
+  const stroke = colorByType[CONNECTION_TYPES.ROUTE];
   const bendX = sourceX - 35;
   const d = `M ${sourceX} ${sourceY} L ${bendX} ${sourceY} L ${bendX} ${targetY} L ${targetX} ${targetY}`;
   return <path d={d} stroke={stroke} strokeWidth="2" fill="none" markerEnd={markerEnd} />;
 }
 
 function SubStepEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.SUBSTEP);
+  const stroke = colorByType[CONNECTION_TYPES.SUBSTEP];
   const d = `M ${sourceX} ${sourceY} L ${sourceX} ${targetY} L ${targetX} ${targetY}`;
   return (
-    <path d={d} stroke={stroke} strokeWidth="2" strokeDasharray="6,4" fill="none" markerEnd={markerEnd} />
+    <path
+      d={d}
+      stroke={stroke}
+      strokeWidth="2"
+      strokeDasharray="6,4"
+      fill="none"
+      markerEnd={markerEnd}
+    />
   );
 }
 
 function ParallelEdge({ sourceX, sourceY, targetY }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.PARALLEL);
+  const stroke = colorByType[CONNECTION_TYPES.PARALLEL];
   const offset = 6;
   return (
     <>
@@ -229,7 +279,7 @@ function ParallelEdge({ sourceX, sourceY, targetY }) {
 }
 
 function DecisionEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.DECISION);
+  const stroke = colorByType[CONNECTION_TYPES.DECISION];
   const diamondX = sourceX + 35;
   const diamondY = sourceY;
   const diamondSize = 16;
@@ -245,8 +295,8 @@ function DecisionEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd 
         <polygon
           points={`${diamondX},${diamondY - diamondSize} ${diamondX + diamondSize},${diamondY} ${diamondX},${diamondY + diamondSize} ${diamondX - diamondSize},${diamondY}`}
           fill={stroke}
-          stroke={wfDecisionDiamond.stroke}
-          strokeWidth={wfDecisionDiamond.strokeWidth}
+          stroke="#b45309"
+          strokeWidth="2"
         />
       )}
       <path d={fromDiamond} stroke={stroke} strokeWidth="2" fill="none" markerEnd={markerEnd} />
@@ -265,7 +315,10 @@ function DecisionEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd 
               data.setEditingEdgeId(id);
             }}
           >
-            <div className={wfEdgeLabelPillClass()} style={{ color: stroke }}>
+            <div
+              className="rounded bg-zinc-950/90 px-2 py-0.5 text-[11px] font-semibold"
+              style={{ color: stroke }}
+            >
               {data.label}
             </div>
           </div>
@@ -276,7 +329,7 @@ function DecisionEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd 
 }
 
 function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
-  const stroke = wfGetEdgeStroke(CONNECTION_TYPES.CONDITION);
+  const stroke = colorByType[CONNECTION_TYPES.CONDITION];
 
   const diamondX = sourceX + 35;
   const diamondY = sourceY;
@@ -293,10 +346,17 @@ function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
       <polygon
         points={`${diamondX},${diamondY - diamondSize} ${diamondX + diamondSize},${diamondY} ${diamondX},${diamondY + diamondSize} ${diamondX - diamondSize},${diamondY}`}
         fill={stroke}
-        stroke={wfConditionDiamond.stroke}
-        strokeWidth={wfConditionDiamond.strokeWidth}
+        stroke="#0e7490"
+        strokeWidth="2"
       />
-      <text x={diamondX} y={diamondY + 4} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">
+      <text
+        x={diamondX}
+        y={diamondY + 4}
+        textAnchor="middle"
+        fill="white"
+        fontSize="10"
+        fontWeight="bold"
+      >
         ?
       </text>
 
@@ -306,10 +366,27 @@ function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
 }
 
 /* ============================== JSON <-> INTERNAL ============================== */
+/**
+ * Internal node format used here:
+ * {
+ *   id,
+ *   type: "process",
+ *   position: {x,y},
+ *   data: {
+ *     label,
+ *     detail,
+ *     gridX, gridY,
+ *     connections: [{targetId, type, label}],
+ *     isStart, isEnd,
+ *     w,h
+ *   }
+ * }
+ */
 function buildInternalFromDiagram(diagram) {
   const rawNodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
   const rawEdges = Array.isArray(diagram?.edges) ? diagram.edges : [];
 
+  // First create nodes
   const internal = rawNodes.map((n) => {
     const { gridX, gridY } = pixelToGrid(n.x ?? 0, n.y ?? 0);
     const pos = gridToPixel(gridX, gridY);
@@ -334,6 +411,7 @@ function buildInternalFromDiagram(diagram) {
 
   const byId = new Map(internal.map((n) => [n.id, n]));
 
+  // Then attach connections
   rawEdges.forEach((e) => {
     const from = byId.get(e.from);
     if (!from) return;
@@ -391,6 +469,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
   const [editingEdgeId, setEditingEdgeId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
 
+  // ✅ Reset ONLY when switching workflows
   useEffect(() => {
     setNodes(buildInternalFromDiagram(initialDiagram));
     setEditingEdgeId(null);
@@ -402,7 +481,9 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
   }, [workflowId]);
 
   const onUpdateLabel = useCallback((nodeId, label) => {
-    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n)));
+    setNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n))
+    );
   }, []);
 
   const onDeleteNode = useCallback((nodeId) => {
@@ -418,6 +499,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
     });
   }, []);
 
+  // ✅ pushDown logic (same as your reference)
   const pushNodesDown = useCallback((fromGridY, excludeIds = []) => {
     setNodes((prev) =>
       prev.map((n) => {
@@ -437,6 +519,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
     );
   }, []);
 
+  // ✅ strict directional addNode (exact behavior you pasted)
   const addConnection = useCallback(
     (sourceNodeId, connectionType) => {
       const source = nodes.find((n) => n.id === sourceNodeId);
@@ -527,6 +610,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
       setNodes((prev) => {
         let updated = [...prev];
 
+        // Convert existing SERIES to DECISION if branching
         if (connectionType === CONNECTION_TYPES.SERIES && existingSeriesConnections.length > 0) {
           updated = updated.map((n) => {
             if (n.id !== sourceNodeId) return n;
@@ -536,7 +620,11 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
                 ...n.data,
                 connections: (n.data.connections || []).map((c) =>
                   c.type === CONNECTION_TYPES.SERIES
-                    ? { ...c, type: CONNECTION_TYPES.DECISION, label: c.label || "Option 1" }
+                    ? {
+                        ...c,
+                        type: CONNECTION_TYPES.DECISION,
+                        label: c.label || "Option 1"
+                      }
                     : c
                 )
               }
@@ -544,6 +632,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
           });
         }
 
+        // Add connection
         updated = updated.map((n) => {
           if (n.id !== sourceNodeId) return n;
           return {
@@ -558,6 +647,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
           };
         });
 
+        // Add new node
         updated.push({
           id: newNodeId,
           type: "process",
@@ -588,7 +678,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
     nodes.forEach((n) => {
       (n.data.connections || []).forEach((conn) => {
         const id = `${n.id}-${conn.targetId}`;
-        const stroke = wfGetEdgeStroke(conn.type);
+        const stroke = colorByType[conn.type] || "#64748b";
         const { sourceHandle, targetHandle } = getHandlesForType(conn.type);
 
         const markerEnd =
@@ -715,7 +805,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        nodesDraggable={false}
+        nodesDraggable={false} // ✅ NO DRAG
         nodesConnectable={false}
         elementsSelectable={true}
         fitView={false}
@@ -725,7 +815,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
         selectionOnDrag={false}
         className="bg-transparent"
       >
-        <Background gap={wfBackgroundGrid.gap} size={wfBackgroundGrid.size} color={wfBackgroundGrid.color} />
+        <Background gap={24} size={1} color="rgba(24,24,27,0.12)" />
 
         {editingEdgeId ? (
           <EdgeLabelRenderer>
@@ -733,7 +823,9 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
               className="absolute left-4 top-4 z-[999] rounded-xl border border-zinc-200/80 bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.05),0_20px_50px_rgba(0,0,0,0.12)]"
               style={{ pointerEvents: "all" }}
             >
-              <div className="mb-2 text-xs font-semibold text-zinc-800">Edit decision label</div>
+              <div className="mb-2 text-xs font-semibold text-zinc-800">
+                Edit decision label
+              </div>
               <input
                 autoFocus
                 value={editingValue}
@@ -751,13 +843,15 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
                 }}
                 className="w-64 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 text-sm text-zinc-900 outline-none"
               />
-              <div className="mt-2 text-[11px] text-zinc-500">Enter to save • Esc to cancel</div>
+              <div className="mt-2 text-[11px] text-zinc-500">
+                Enter to save • Esc to cancel
+              </div>
             </div>
           </EdgeLabelRenderer>
         ) : null}
       </ReactFlow>
 
-      <div className={wfHintOverlayClass}>
+      <div className="absolute bottom-3 left-3 rounded-xl border border-zinc-200/80 bg-white/90 px-3 py-2 text-xs text-zinc-700">
         💡 Click icons to add connections • Click decision labels to edit • Alt+drag to pan
       </div>
     </>
@@ -773,24 +867,26 @@ const DiagramContainer = memo(
         style={{ height }}
       >
         <ReactFlowProvider>
-          <WorkflowFlowEditor ref={ref} workflowId={workflowId} initialDiagram={initialDiagram} />
+          <WorkflowFlowEditor
+            ref={ref}
+            workflowId={workflowId}
+            initialDiagram={initialDiagram}
+          />
         </ReactFlowProvider>
       </div>
     );
   }),
-  (prevProps, nextProps) => prevProps.workflowId === nextProps.workflowId
+  (prevProps, nextProps) => {
+    // Only re-render if workflowId changes
+    // This prevents remounting when parent state updates (like title input)
+    return prevProps.workflowId === nextProps.workflowId;
+  }
 );
 
 /* ============================== MAIN WORKFLOWS VIEW ============================== */
 export default function Workflows() {
-  const {
-    workflows,
-    selectedWorkflowId,
-    setSelectedWorkflowId,
-    createWorkflow,
-    updateWorkflowLocal,
-    deleteWorkflow
-  } = useDFMEA();
+  const { workflows, selectedWorkflowId, setSelectedWorkflowId, createWorkflow, updateWorkflowLocal } =
+    useDFMEA();
 
   const activeWorkflow = useMemo(
     () => workflows.find((w) => w.id === selectedWorkflowId) || null,
@@ -818,6 +914,7 @@ export default function Workflows() {
       const diagram = editorRef.current?.exportDiagram?.();
       if (!diagram) throw new Error("No diagram export available");
 
+      // ✅ optimistic update
       updateWorkflowLocal(activeWorkflow.id, { diagram });
 
       const res = await fetch("/api/workflows/save", {
@@ -855,17 +952,6 @@ export default function Workflows() {
 
   function addStep() {
     editorRef.current?.ensureStartNodeIfEmpty?.();
-  }
-
-  function handleDeleteActiveWorkflow() {
-    if (!activeWorkflow) return;
-
-    const ok = window.confirm(
-      `Delete workflow "${activeWorkflow.title?.trim() ? activeWorkflow.title : "Untitled workflow"}"?`
-    );
-    if (!ok) return;
-
-    deleteWorkflow?.(activeWorkflow.id);
   }
 
   const diagramHeight = "calc(100vh - 170px)";
@@ -959,22 +1045,6 @@ export default function Workflows() {
             {saving ? "Saving..." : "Save"}
           </button>
 
-          {/* ✅ NEW: Delete workflow */}
-          <button
-            onClick={handleDeleteActiveWorkflow}
-            disabled={!activeWorkflow}
-            className={cx(
-              "text-[12px] px-3 py-2 rounded-xl border transition-colors inline-flex items-center gap-2",
-              activeWorkflow
-                ? "bg-white border-zinc-200/80 hover:bg-amber-50 text-amber-900"
-                : "bg-zinc-100 border-zinc-200/80 text-zinc-400 cursor-not-allowed"
-            )}
-            title="Delete selected workflow"
-          >
-            <Trash2 size={16} strokeWidth={2} />
-            Delete
-          </button>
-
           <button
             onClick={() => setViewMode("diagram")}
             className={cx(
@@ -1022,7 +1092,9 @@ export default function Workflows() {
             <div className="text-[11px] text-zinc-500 tracking-tight">Summary</div>
             <input
               value={activeWorkflow.summary || ""}
-              onChange={(e) => updateWorkflowLocal(activeWorkflow.id, { summary: e.target.value })}
+              onChange={(e) =>
+                updateWorkflowLocal(activeWorkflow.id, { summary: e.target.value })
+              }
               className="mt-1 w-full rounded-xl border border-zinc-200/80 bg-white px-3 py-2
                          text-[13px] tracking-tight text-zinc-900 outline-none
                          focus:ring-2 focus:ring-zinc-300"

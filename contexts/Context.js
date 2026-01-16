@@ -1,158 +1,189 @@
 // contexts/Context.js
 "use client";
 
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState
 } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 const DFMEAContext = createContext(null);
 
-function makeId() {
-  return `wf-${Math.random().toString(16).slice(2, 8)}`;
-}
-
 export function DFMEAProvider({ children, initialWorkflows = [] }) {
-  // -----------------------------
-  // ✅ Tab navigation
-  // -----------------------------
+  /* ----------------------------- App shell ----------------------------- */
   const [activeTab, setActiveTab] = useState("requirements");
 
-  // -----------------------------
-  // ✅ Workflows
-  // -----------------------------
-  const [workflows, setWorkflows] = useState(initialWorkflows);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState(
-    initialWorkflows?.[0]?.id ?? ""
+  /* ----------------------------- Workflows ----------------------------- */
+  const [workflows, setWorkflows] = useState(() =>
+    Array.isArray(initialWorkflows) ? initialWorkflows : []
   );
 
-  const createWorkflow = useCallback(() => {
-    const id = makeId();
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(() => {
+    const first = Array.isArray(initialWorkflows) ? initialWorkflows[0] : null;
+    return first?.id || "";
+  });
 
-    const wf = {
-      id,
-      title: "Untitled workflow",
-      summary: "",
-      category: "custom",
-      owner: "me",
-      textSteps: [],
-      diagram: {
-        grid: 20,
-        zoom: 1,
-        pan: { x: 60, y: 60 },
-        nodes: [],
-        edges: []
-      }
-    };
-
-    setWorkflows((prev) => [...prev, wf]);
-    setSelectedWorkflowId(id);
-    setActiveTab("workflows");
-  }, []);
-
-  // ✅ accepts: (id, patch) OR (workflowObject)
-  const updateWorkflowLocal = useCallback((a, b) => {
-    // case 1: updateWorkflowLocal(workflowObject)
-    if (a && typeof a === "object" && a.id && b === undefined) {
-      const wf = a;
-      setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? { ...w, ...wf } : w)));
-      return;
-    }
-
-    // case 2: updateWorkflowLocal(id, patch)
-    const workflowId = a;
-    const patch = b;
-
-    if (!workflowId || !patch) return;
-
+  const updateWorkflowLocal = useCallback((workflowId, patch) => {
+    if (!workflowId) return;
     setWorkflows((prev) =>
       prev.map((w) => (w.id === workflowId ? { ...w, ...patch } : w))
     );
   }, []);
 
-  // -----------------------------
-  // ✅ Your existing notice system
-  // -----------------------------
+  const createWorkflow = useCallback(() => {
+    const id = uuidv4();
+    const wf = {
+      id,
+      category: "custom",
+      owner: "me",
+      title: "Untitled workflow",
+      summary: "",
+      textSteps: [],
+      diagram: {
+        nodes: [],
+        edges: [],
+        zoom: 1,
+        pan: { x: 60, y: 60 }
+      }
+    };
+
+    setWorkflows((prev) => [wf, ...prev]);
+    setSelectedWorkflowId(id);
+    setActiveTab("workflows");
+
+    return wf;
+  }, []);
+
+  async function deleteWorkflow(workflowId) {
+    const id = String(workflowId || "").trim();
+    if (!id) return;
+
+    // optimistic local delete
+    setWorkflows((prev) => prev.filter((w) => w.id !== id));
+
+    setSelectedWorkflowId((prevSelected) => {
+      if (prevSelected !== id) return prevSelected;
+      // pick the next available workflow (best effort)
+      const remaining = workflows.filter((w) => w.id !== id);
+      return remaining[0]?.id || "";
+    });
+
+    try {
+      const res = await fetch("/api/workflows/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowId: id })
+      });
+
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "Delete failed");
+    } catch (err) {
+      console.error(err);
+
+      // If delete fails, refresh from disk to re-sync truth
+      try {
+        const res = await fetch("/api/workflows", { cache: "no-store" });
+        const j = await res.json();
+        const next = j?.data?.content?.workflows ?? [];
+        setWorkflows(Array.isArray(next) ? next : []);
+      } catch (e) {
+        console.error("Failed to resync workflows after delete error", e);
+      }
+
+      alert(`Delete failed: ${err?.message || "unknown error"}`);
+    }
+  }
+
+  /* ----------------------------- Requirements unlock ----------------------------- */
+  const [requirementsComplete, setRequirementsComplete] = useState(false);
+  const [requirementsDevUnlocked, setRequirementsDevUnlocked] = useState(false);
+
+  const unlockFromRequirementsListView = useCallback(() => {
+    setRequirementsDevUnlocked(true);
+  }, []);
+
+  /* ----------------------------- Change notices (mock) ----------------------------- */
   const [activeNotice, setActiveNotice] = useState(null);
   const [noticeHistory, setNoticeHistory] = useState([]);
   const [noticeAnalyzing, setNoticeAnalyzing] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
-  const timersRef = useRef([]);
 
-  const [requirementsComplete, setRequirementsComplete] = useState(false);
-  const [requirementsDevUnlocked, setRequirementsDevUnlocked] = useState(false);
+  const timersRef = useRef([]);
 
   const cleanupTimers = useCallback(() => {
     timersRef.current.forEach((t) => clearTimeout(t));
     timersRef.current = [];
   }, []);
 
-  const pushChangeNotice = useCallback((notice) => {
-    if (!notice?.noticeId) return;
+  const pushChangeNotice = useCallback(
+    (notice) => {
+      const n = {
+        noticeId: notice.noticeId || uuidv4(),
+        reqId: notice.reqId || "REQ-???",
+        summary: notice.summary || "Change requested",
+        impact: notice.impact || "Impact unknown",
+        requestedBy: notice.requestedBy || "Someone",
+        timestamp: notice.timestamp || "Just now"
+      };
 
-    setActiveNotice(notice);
+      setNoticeHistory((prev) => [n, ...prev]);
+      setActiveNotice(n);
+      setUnreadCount((c) => c + 1);
 
-    setNoticeHistory((prev) => {
-      const next = [notice, ...prev.filter((n) => n.noticeId !== notice.noticeId)];
-      return next.slice(0, 6);
-    });
+      setNoticeAnalyzing((prev) => ({ ...prev, [n.noticeId]: true }));
 
-    setUnreadCount((c) => Math.min(c + 1, 9));
-    setNoticeAnalyzing((p) => ({ ...p, [notice.noticeId]: true }));
+      const t = setTimeout(() => {
+        setNoticeAnalyzing((prev) => ({ ...prev, [n.noticeId]: false }));
+      }, 2200);
 
-    const t = setTimeout(() => {
-      setNoticeAnalyzing((p) => ({ ...p, [notice.noticeId]: false }));
-    }, 5000);
+      timersRef.current.push(t);
+    },
+    [setNoticeHistory]
+  );
 
-    timersRef.current.push(t);
+  const markAllRead = useCallback(() => {
+    setUnreadCount(0);
   }, []);
 
-  const dismissActiveNotice = useCallback(() => setActiveNotice(null), []);
-  const markAllRead = useCallback(() => setUnreadCount(0), []);
-
-  const unlockFromRequirementsListView = useCallback(() => {
-    setRequirementsDevUnlocked(true);
+  const dismissActiveNotice = useCallback(() => {
+    setActiveNotice(null);
   }, []);
 
-  const resetRequirementsUnlocks = useCallback(() => {
-    setRequirementsComplete(false);
-    setRequirementsDevUnlocked(false);
-  }, []);
-
+  /* ----------------------------- Context value ----------------------------- */
   const value = useMemo(
     () => ({
-      // ✅ tabs
+      // tabs
       activeTab,
       setActiveTab,
 
-      // ✅ workflows
+      // workflows
       workflows,
-      setWorkflows,
       selectedWorkflowId,
       setSelectedWorkflowId,
       createWorkflow,
       updateWorkflowLocal,
+      deleteWorkflow,
 
-      // ✅ notices
+      // requirements gating
+      requirementsComplete,
+      setRequirementsComplete,
+      unlockFromRequirementsListView,
+      requirementsDevUnlocked,
+
+      // change notices
       activeNotice,
       noticeHistory,
       noticeAnalyzing,
       unreadCount,
       pushChangeNotice,
-      dismissActiveNotice,
-      markAllRead,
       cleanupTimers,
-
-      // ✅ gating
-      requirementsComplete,
-      setRequirementsComplete,
-      requirementsDevUnlocked,
-      unlockFromRequirementsListView,
-      resetRequirementsUnlocks
+      markAllRead,
+      dismissActiveNotice
     }),
     [
       activeTab,
@@ -160,18 +191,17 @@ export function DFMEAProvider({ children, initialWorkflows = [] }) {
       selectedWorkflowId,
       createWorkflow,
       updateWorkflowLocal,
+      requirementsComplete,
+      unlockFromRequirementsListView,
+      requirementsDevUnlocked,
       activeNotice,
       noticeHistory,
       noticeAnalyzing,
       unreadCount,
       pushChangeNotice,
-      dismissActiveNotice,
-      markAllRead,
       cleanupTimers,
-      requirementsComplete,
-      requirementsDevUnlocked,
-      unlockFromRequirementsListView,
-      resetRequirementsUnlocks
+      markAllRead,
+      dismissActiveNotice
     ]
   );
 
@@ -180,6 +210,6 @@ export function DFMEAProvider({ children, initialWorkflows = [] }) {
 
 export function useDFMEA() {
   const ctx = useContext(DFMEAContext);
-  if (!ctx) throw new Error("useDFMEA must be used within DFMEAProvider");
+  if (!ctx) throw new Error("useDFMEA must be used inside DFMEAProvider");
   return ctx;
 }

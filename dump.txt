@@ -1,4 +1,4 @@
-PROJECT DUMP (2026-01-16T14:10:04)
+PROJECT DUMP (2026-01-16T15:21:39)
 ROOT: D:/dfmea_v6_frontendmockup/dfmea_v6_frontendmockup
 EXCLUDES: (none)
 
@@ -2644,6 +2644,7 @@ FILE: components/Workflows.js
 
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -2662,14 +2663,14 @@ import {
   Position,
   Handle,
   EdgeLabelRenderer,
-  useReactFlow,
-  applyNodeChanges
+  useReactFlow
 } from "@xyflow/react";
 
 import { useDFMEA } from "@/contexts/Context";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
+/* ============================== TYPES / CONSTANTS ============================== */
 const CONNECTION_TYPES = {
   SERIES: "series",
   DECISION: "decision",
@@ -2685,6 +2686,16 @@ const GRID = {
   NODE_WIDTH: 120,
   NODE_HEIGHT: 40
 };
+
+const gridToPixel = (gridX, gridY) => ({
+  x: gridX * GRID.CELL_WIDTH,
+  y: gridY * GRID.CELL_HEIGHT
+});
+
+const pixelToGrid = (x, y) => ({
+  gridX: Math.round((x ?? 0) / GRID.CELL_WIDTH),
+  gridY: Math.round((y ?? 0) / GRID.CELL_HEIGHT)
+});
 
 const colorByType = {
   [CONNECTION_TYPES.SERIES]: "#3b82f6",
@@ -2708,13 +2719,7 @@ function getHandlesForType(type) {
   }
 }
 
-function snapToGridPx(val, cell) {
-  return Math.round(val / cell) * cell;
-}
-
-/**
- * NODE
- */
+/* ============================== NODE ============================== */
 function ProcessNode({ id, data, selected }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(data.label);
@@ -2773,6 +2778,7 @@ function ProcessNode({ id, data, selected }) {
 
   return (
     <div className="group relative" style={{ width: GRID.NODE_WIDTH }}>
+      {/* Hidden handles */}
       <Handle id="l" type="source" position={Position.Left} style={{ opacity: 0 }} />
       <Handle id="r" type="source" position={Position.Right} style={{ opacity: 0 }} />
       <Handle id="t" type="source" position={Position.Top} style={{ opacity: 0 }} />
@@ -2855,9 +2861,7 @@ function ProcessNode({ id, data, selected }) {
   );
 }
 
-/**
- * EDGES
- */
+/* ============================== EDGES ============================== */
 function SeriesEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd }) {
   const stroke = colorByType[CONNECTION_TYPES.SERIES];
   return (
@@ -2965,30 +2969,90 @@ function DecisionEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd 
   );
 }
 
+function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
+  const stroke = colorByType[CONNECTION_TYPES.CONDITION];
+
+  const diamondX = sourceX + 35;
+  const diamondY = sourceY;
+  const diamondSize = 14;
+
+  const bendX = diamondX + diamondSize + 20;
+
+  const toDiamond = `M ${sourceX} ${sourceY} L ${diamondX - diamondSize} ${diamondY}`;
+  const fromDiamond = `M ${diamondX + diamondSize} ${diamondY} L ${bendX} ${diamondY} L ${bendX} ${targetY} L ${targetX} ${targetY}`;
+
+  return (
+    <>
+      <path d={toDiamond} stroke={stroke} strokeWidth="2" fill="none" />
+      <polygon
+        points={`${diamondX},${diamondY - diamondSize} ${diamondX + diamondSize},${diamondY} ${diamondX},${diamondY + diamondSize} ${diamondX - diamondSize},${diamondY}`}
+        fill={stroke}
+        stroke="#0e7490"
+        strokeWidth="2"
+      />
+      <text
+        x={diamondX}
+        y={diamondY + 4}
+        textAnchor="middle"
+        fill="white"
+        fontSize="10"
+        fontWeight="bold"
+      >
+        ?
+      </text>
+
+      <path d={fromDiamond} stroke={stroke} strokeWidth="2" fill="none" markerEnd={markerEnd} />
+    </>
+  );
+}
+
+/* ============================== JSON <-> INTERNAL ============================== */
 /**
- * JSON <-> INTERNAL
+ * Internal node format used here:
+ * {
+ *   id,
+ *   type: "process",
+ *   position: {x,y},
+ *   data: {
+ *     label,
+ *     detail,
+ *     gridX, gridY,
+ *     connections: [{targetId, type, label}],
+ *     isStart, isEnd,
+ *     w,h
+ *   }
+ * }
  */
 function buildInternalFromDiagram(diagram) {
-  const rawNodes = diagram?.nodes ?? [];
-  const rawEdges = diagram?.edges ?? [];
+  const rawNodes = Array.isArray(diagram?.nodes) ? diagram.nodes : [];
+  const rawEdges = Array.isArray(diagram?.edges) ? diagram.edges : [];
 
-  const internal = rawNodes.map((n) => ({
-    id: n.id,
-    type: "process",
-    position: { x: n.x ?? 0, y: n.y ?? 0 },
-    data: {
-      label: n.title || "Step",
-      detail: n.detail || "",
-      connections: [],
-      isStart: n.type === "start",
-      isEnd: n.type === "end",
-      w: n.w ?? 260,
-      h: n.h ?? 80
-    }
-  }));
+  // First create nodes
+  const internal = rawNodes.map((n) => {
+    const { gridX, gridY } = pixelToGrid(n.x ?? 0, n.y ?? 0);
+    const pos = gridToPixel(gridX, gridY);
+
+    return {
+      id: n.id,
+      type: "process",
+      position: pos,
+      data: {
+        label: n.title || "Step",
+        detail: n.detail || "",
+        gridX,
+        gridY,
+        connections: [],
+        isStart: n.type === "start",
+        isEnd: n.type === "end",
+        w: n.w ?? 260,
+        h: n.h ?? 80
+      }
+    };
+  });
 
   const byId = new Map(internal.map((n) => [n.id, n]));
 
+  // Then attach connections
   rawEdges.forEach((e) => {
     const from = byId.get(e.from);
     if (!from) return;
@@ -3035,9 +3099,7 @@ function exportDiagramFromInternal(internalNodes, viewport) {
   };
 }
 
-/**
- * EDITOR
- */
+/* ============================== EDITOR (STRICT LAYOUT, NO DRAG) ============================== */
 const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
   { workflowId, initialDiagram },
   ref
@@ -3078,24 +3140,141 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
     });
   }, []);
 
+  // ✅ pushDown logic (same as your reference)
+  const pushNodesDown = useCallback((fromGridY, excludeIds = []) => {
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (excludeIds.includes(n.id)) return n;
+        const gy = n.data.gridY ?? 0;
+        const gx = n.data.gridX ?? 0;
+        if (gy >= fromGridY) {
+          const nextGY = gy + 1;
+          return {
+            ...n,
+            position: gridToPixel(gx, nextGY),
+            data: { ...n.data, gridY: nextGY }
+          };
+        }
+        return n;
+      })
+    );
+  }, []);
+
+  // ✅ strict directional addNode (exact behavior you pasted)
   const addConnection = useCallback(
     (sourceNodeId, connectionType) => {
       const source = nodes.find((n) => n.id === sourceNodeId);
       if (!source) return;
 
       const newNodeId = uuidv4();
-      const strokeType = connectionType || CONNECTION_TYPES.SERIES;
+      const existing = source.data.connections || [];
 
-      const baseX = source.position.x + GRID.CELL_WIDTH;
-      const baseY = source.position.y;
+      const countByType = (type) =>
+        existing.filter(
+          (c) =>
+            c.type === type ||
+            (type === CONNECTION_TYPES.SERIES && c.type === CONNECTION_TYPES.DECISION)
+        ).length;
 
-      const newPos = {
-        x: snapToGridPx(baseX, GRID.CELL_WIDTH),
-        y: snapToGridPx(baseY, GRID.CELL_HEIGHT)
-      };
+      let gridX = source.data.gridX ?? 0;
+      let gridY = source.data.gridY ?? 0;
+      let pushFrom = null;
+
+      switch (connectionType) {
+        case CONNECTION_TYPES.ROUTE: {
+          const routeCount = countByType(CONNECTION_TYPES.ROUTE);
+          gridX = (source.data.gridX ?? 0) - 2;
+          gridY = (source.data.gridY ?? 0) + routeCount;
+          if (routeCount > 0) pushFrom = gridY;
+          break;
+        }
+
+        case CONNECTION_TYPES.CONDITION: {
+          const conditionCount = countByType(CONNECTION_TYPES.CONDITION);
+          gridX = (source.data.gridX ?? 0) + 2;
+          gridY = (source.data.gridY ?? 0) + 1 + conditionCount;
+          pushFrom = gridY;
+          break;
+        }
+
+        case CONNECTION_TYPES.SUBSTEP: {
+          const subCount = countByType(CONNECTION_TYPES.SUBSTEP);
+          gridX = (source.data.gridX ?? 0) + 1;
+          gridY = (source.data.gridY ?? 0) + 1 + subCount;
+          pushFrom = gridY;
+          break;
+        }
+
+        case CONNECTION_TYPES.SERIES: {
+          const seriesCount = countByType(CONNECTION_TYPES.SERIES);
+          gridX = (source.data.gridX ?? 0) + 2;
+
+          if (seriesCount === 0) {
+            gridY = source.data.gridY ?? 0;
+          } else {
+            gridY = (source.data.gridY ?? 0) + seriesCount;
+            pushFrom = gridY;
+          }
+          break;
+        }
+
+        case CONNECTION_TYPES.PARALLEL: {
+          const parCount = countByType(CONNECTION_TYPES.PARALLEL);
+          const substepCount = countByType(CONNECTION_TYPES.SUBSTEP);
+
+          gridX = source.data.gridX ?? 0;
+          gridY = (source.data.gridY ?? 0) + 1 + substepCount + parCount;
+          pushFrom = gridY;
+          break;
+        }
+
+        default:
+          break;
+      }
+
+      const existingSeriesConnections = existing.filter(
+        (c) => c.type === CONNECTION_TYPES.SERIES || c.type === CONNECTION_TYPES.DECISION
+      );
+
+      let actualType = connectionType;
+      let connectionLabel = "";
+
+      if (connectionType === CONNECTION_TYPES.SERIES && existingSeriesConnections.length > 0) {
+        actualType = CONNECTION_TYPES.DECISION;
+        connectionLabel = `Option ${existingSeriesConnections.length + 1}`;
+      }
+
+      if (pushFrom !== null) pushNodesDown(pushFrom, [sourceNodeId]);
+
+      const newPos = gridToPixel(gridX, gridY);
 
       setNodes((prev) => {
-        const next = prev.map((n) => {
+        let updated = [...prev];
+
+        // Convert existing SERIES to DECISION if branching
+        if (connectionType === CONNECTION_TYPES.SERIES && existingSeriesConnections.length > 0) {
+          updated = updated.map((n) => {
+            if (n.id !== sourceNodeId) return n;
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                connections: (n.data.connections || []).map((c) =>
+                  c.type === CONNECTION_TYPES.SERIES
+                    ? {
+                        ...c,
+                        type: CONNECTION_TYPES.DECISION,
+                        label: c.label || "Option 1"
+                      }
+                    : c
+                )
+              }
+            };
+          });
+        }
+
+        // Add connection
+        updated = updated.map((n) => {
           if (n.id !== sourceNodeId) return n;
           return {
             ...n,
@@ -3103,19 +3282,22 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
               ...n.data,
               connections: [
                 ...(n.data.connections || []),
-                { targetId: newNodeId, type: strokeType, label: "" }
+                { targetId: newNodeId, type: actualType, label: connectionLabel }
               ]
             }
           };
         });
 
-        next.push({
+        // Add new node
+        updated.push({
           id: newNodeId,
           type: "process",
           position: newPos,
           data: {
             label: "Step",
             detail: "",
+            gridX,
+            gridY,
             connections: [],
             isStart: false,
             isEnd: false,
@@ -3124,30 +3306,11 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
           }
         });
 
-        return next;
+        return updated;
       });
     },
-    [nodes]
+    [nodes, pushNodesDown]
   );
-
-  const onNodesChange = useCallback((changes) => {
-    setNodes((nds) => applyNodeChanges(changes, nds));
-  }, []);
-
-  const onNodeDragStop = useCallback((_, node) => {
-    setNodes((prev) =>
-      prev.map((n) => {
-        if (n.id !== node.id) return n;
-        return {
-          ...n,
-          position: {
-            x: snapToGridPx(node.position.x, GRID.CELL_WIDTH),
-            y: snapToGridPx(node.position.y, GRID.CELL_HEIGHT)
-          }
-        };
-      })
-    );
-  }, []);
 
   const edges = useMemo(() => {
     const all = [];
@@ -3225,7 +3388,8 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
       [CONNECTION_TYPES.DECISION]: DecisionEdge,
       [CONNECTION_TYPES.ROUTE]: RouteEdge,
       [CONNECTION_TYPES.SUBSTEP]: SubStepEdge,
-      [CONNECTION_TYPES.PARALLEL]: ParallelEdge
+      [CONNECTION_TYPES.PARALLEL]: ParallelEdge,
+      [CONNECTION_TYPES.CONDITION]: ConditionEdge
     }),
     []
   );
@@ -3247,15 +3411,18 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
     ensureStartNodeIfEmpty() {
       setNodes((prev) => {
         if (prev.length) return prev;
-
+        const startGX = 3;
+        const startGY = 1;
         return [
           {
             id: "start",
             type: "process",
-            position: { x: 3 * GRID.CELL_WIDTH, y: 1 * GRID.CELL_HEIGHT },
+            position: gridToPixel(startGX, startGY),
             data: {
               label: "Start",
               detail: "",
+              gridX: startGX,
+              gridY: startGY,
               connections: [],
               isStart: true,
               isEnd: false,
@@ -3279,12 +3446,10 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        nodesDraggable={true}
+        nodesDraggable={false} // ✅ NO DRAG
         nodesConnectable={false}
         elementsSelectable={true}
         fitView={false}
-        onNodesChange={onNodesChange}
-        onNodeDragStop={onNodeDragStop}
         defaultViewport={{ x: 60, y: 60, zoom: 1 }}
         panOnDrag={[1, 2]}
         panActivationKeyCode="Alt"
@@ -3328,23 +3493,41 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
       </ReactFlow>
 
       <div className="absolute bottom-3 left-3 rounded-xl border border-zinc-200/80 bg-white/90 px-3 py-2 text-xs text-zinc-700">
-        💡 Drag nodes to reposition • Click icons to add connections • Alt+drag to pan
+        💡 Click icons to add connections • Click decision labels to edit • Alt+drag to pan
       </div>
     </>
   );
 });
 
-/**
- * MAIN
- */
+/* ============================== MEMOIZED DIAGRAM CONTAINER ============================== */
+const DiagramContainer = memo(
+  forwardRef(function DiagramContainer({ workflowId, initialDiagram, height }, ref) {
+    return (
+      <div
+        className="relative rounded-2xl border border-zinc-200/80 bg-[#fbfbfa] overflow-hidden"
+        style={{ height }}
+      >
+        <ReactFlowProvider>
+          <WorkflowFlowEditor
+            ref={ref}
+            workflowId={workflowId}
+            initialDiagram={initialDiagram}
+          />
+        </ReactFlowProvider>
+      </div>
+    );
+  }),
+  (prevProps, nextProps) => {
+    // Only re-render if workflowId changes
+    // This prevents remounting when parent state updates (like title input)
+    return prevProps.workflowId === nextProps.workflowId;
+  }
+);
+
+/* ============================== MAIN WORKFLOWS VIEW ============================== */
 export default function Workflows() {
-  const {
-    workflows,
-    selectedWorkflowId,
-    setSelectedWorkflowId,
-    createWorkflow,
-    updateWorkflowLocal
-  } = useDFMEA();
+  const { workflows, selectedWorkflowId, setSelectedWorkflowId, createWorkflow, updateWorkflowLocal } =
+    useDFMEA();
 
   const activeWorkflow = useMemo(
     () => workflows.find((w) => w.id === selectedWorkflowId) || null,
@@ -3362,7 +3545,6 @@ export default function Workflows() {
     setSavedToast(false);
   }, [activeWorkflow?.id]);
 
-  // ✅ Save: keep UI, update state immediately, then persist
   async function saveLayout() {
     if (!activeWorkflow || saving) return;
 
@@ -3373,7 +3555,7 @@ export default function Workflows() {
       const diagram = editorRef.current?.exportDiagram?.();
       if (!diagram) throw new Error("No diagram export available");
 
-      // ✅ optimistic update so UI never blanks out
+      // ✅ optimistic update
       updateWorkflowLocal(activeWorkflow.id, { diagram });
 
       const res = await fetch("/api/workflows/save", {
@@ -3381,9 +3563,13 @@ export default function Workflows() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workflowId: activeWorkflow.id,
-          workflow: {
-            ...activeWorkflow,
-            diagram
+          diagram,
+          meta: {
+            title: activeWorkflow.title,
+            summary: activeWorkflow.summary,
+            category: activeWorkflow.category,
+            owner: activeWorkflow.owner,
+            textSteps: activeWorkflow.textSteps
           }
         })
       });
@@ -3391,7 +3577,6 @@ export default function Workflows() {
       const j = await res.json();
       if (!j?.ok) throw new Error(j?.error || "Save failed");
 
-      // ✅ merge server response (if any) without clearing UI
       if (j?.workflow?.id) {
         updateWorkflowLocal(j.workflow.id, j.workflow);
       }
@@ -3406,36 +3591,11 @@ export default function Workflows() {
     }
   }
 
-  // ✅ Add step = ONLY create a start node if empty workflow
   function addStep() {
     editorRef.current?.ensureStartNodeIfEmpty?.();
   }
 
-  const Diagram = () => {
-    const diagramHeight = "calc(100vh - 170px)";
-
-    return (
-      <div
-        className="relative rounded-2xl border border-zinc-200/80 bg-[#fbfbfa] overflow-hidden"
-        style={{ height: diagramHeight }}
-      >
-        <ReactFlowProvider>
-          <WorkflowFlowEditor
-            ref={editorRef}
-            workflowId={activeWorkflow?.id || "none"}
-            initialDiagram={
-              activeWorkflow?.diagram || {
-                nodes: [],
-                edges: [],
-                zoom: 1,
-                pan: { x: 60, y: 60 }
-              }
-            }
-          />
-        </ReactFlowProvider>
-      </div>
-    );
-  };
+  const diagramHeight = "calc(100vh - 170px)";
 
   const EmptyState = () => (
     <div className="rounded-2xl border border-zinc-200/80 bg-white p-10 shadow-[0_1px_0_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.06)]">
@@ -3554,18 +3714,14 @@ export default function Workflows() {
         </div>
       </div>
 
-      {/* ✅ rename inputs */}
+      {/* rename inputs */}
       {activeWorkflow ? (
         <div className="mt-3 grid grid-cols-12 gap-3">
           <div className="col-span-7">
-            <div className="text-[11px] text-zinc-500 tracking-tight">
-              Workflow title
-            </div>
+            <div className="text-[11px] text-zinc-500 tracking-tight">Workflow title</div>
             <input
               value={activeWorkflow.title || ""}
-              onChange={(e) =>
-                updateWorkflowLocal(activeWorkflow.id, { title: e.target.value })
-              }
+              onChange={(e) => updateWorkflowLocal(activeWorkflow.id, { title: e.target.value })}
               className="mt-1 w-full rounded-xl border border-zinc-200/80 bg-white px-3 py-2
                          text-[13px] tracking-tight text-zinc-900 outline-none
                          focus:ring-2 focus:ring-zinc-300"
@@ -3593,7 +3749,19 @@ export default function Workflows() {
         {!activeWorkflow ? (
           <EmptyState />
         ) : viewMode === "diagram" ? (
-          <Diagram />
+          <DiagramContainer
+            ref={editorRef}
+            workflowId={activeWorkflow.id}
+            initialDiagram={
+              activeWorkflow.diagram || {
+                nodes: [],
+                edges: [],
+                zoom: 1,
+                pan: { x: 60, y: 60 }
+              }
+            }
+            height={diagramHeight}
+          />
         ) : (
           <TextView />
         )}
