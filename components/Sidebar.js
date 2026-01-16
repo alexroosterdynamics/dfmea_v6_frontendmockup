@@ -15,6 +15,8 @@ import {
   Plus
 } from "lucide-react";
 
+import { useDFMEA } from "@/contexts/Context";
+
 const cx = (...c) => c.filter(Boolean).join(" ");
 
 function NavItem({ icon: Icon, label, active, onClick, right }) {
@@ -36,34 +38,7 @@ function NavItem({ icon: Icon, label, active, onClick, right }) {
   );
 }
 
-function ModernCheckbox({ defaultChecked }) {
-  const [checked, setChecked] = useState(!!defaultChecked);
-
-  const tick =
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27white%27%20stroke-width%3D%272.8%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%2720%206%209%2017%204%2012%27/%3E%3C/svg%3E";
-
-  return (
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => setChecked(e.target.checked)}
-      className={cx(
-        "h-4 w-4 rounded-[6px] appearance-none",
-        "bg-white border border-zinc-300/80",
-        "focus:outline-none focus:ring-2 focus:ring-zinc-300",
-        "transition bg-no-repeat bg-center"
-      )}
-      style={{
-        backgroundSize: "14px 14px",
-        backgroundImage: checked ? `url("${tick}")` : "none",
-        backgroundColor: checked ? "#18181b" : "#ffffff"
-      }}
-      aria-checked={checked}
-    />
-  );
-}
-
-function SubItem({ label, onClick, active, icon: Icon }) {
+function SubItem({ label, onClick, active }) {
   return (
     <button
       type="button"
@@ -76,22 +51,21 @@ function SubItem({ label, onClick, active, icon: Icon }) {
         active ? "text-zinc-900 bg-zinc-200/40" : "text-zinc-700"
       )}
     >
-      {Icon ? <Icon size={14} strokeWidth={1.8} className="text-zinc-600" /> : null}
       <span className="truncate">{label}</span>
     </button>
   );
 }
 
-export default function Sidebar({
-  tasksTitle,
-  tasks = [],
-  activeTab,
-  onChangeTab,
-  workflows = [],
-  selectedWorkflowId,
-  onSelectWorkflowId,
-  onCreateWorkflow
-}) {
+export default function Sidebar({ tasksTitle, tasks = [] }) {
+  const {
+    activeTab,
+    setActiveTab,
+    workflows,
+    selectedWorkflowId,
+    setSelectedWorkflowId,
+    createWorkflow
+  } = useDFMEA();
+
   // ✅ collapsed by default
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
 
@@ -108,10 +82,6 @@ export default function Sidebar({
     ),
     [workflowsOpen]
   );
-
-  const firstDesign = workflows.find((w) => w.category === "design")?.id;
-  const firstValidation = workflows.find((w) => w.category === "validation")?.id;
-  const firstMine = workflows.find((w) => w.owner === "me")?.id;
 
   return (
     <aside className="w-[280px] h-full bg-[#f5f5f3] border-r border-zinc-200/70">
@@ -143,58 +113,69 @@ export default function Sidebar({
 
         {/* nav */}
         <div className="mt-3 px-2 space-y-0.5">
-          <NavItem icon={Home} label="Home" />
-          <NavItem icon={CalendarDays} label="Meetings" />
-          <NavItem icon={Sparkles} label="Notion AI" />
-          <NavItem icon={Inbox} label="Inbox" />
+          <NavItem
+            icon={Home}
+            label="Home"
+            active={activeTab === "home"}
+            onClick={() => setActiveTab("home")}
+          />
+          <NavItem
+            icon={CalendarDays}
+            label="Meetings"
+            active={activeTab === "meetings"}
+            onClick={() => setActiveTab("meetings")}
+          />
+          <NavItem
+            icon={Sparkles}
+            label="Notion AI"
+            active={activeTab === "ai"}
+            onClick={() => setActiveTab("ai")}
+          />
+          <NavItem
+            icon={Inbox}
+            label="Inbox"
+            active={activeTab === "inbox"}
+            onClick={() => setActiveTab("inbox")}
+          />
 
-          {/* Workflows */}
+          {/* ✅ Workflows: ONLY expand/collapse menu (DO NOT open editor) */}
           <NavItem
             icon={GitBranch}
             label="Workflows"
-            active={activeTab === "workflows"}
+            active={workflowsOpen} // highlight based on expansion, not activeTab
             right={rightChevron}
-            onClick={() => {
-              setWorkflowsOpen((v) => !v);
-              onChangeTab?.("workflows");
-            }}
+            onClick={() => setWorkflowsOpen((v) => !v)}
           />
 
           {workflowsOpen ? (
             <div className="pl-6 mt-0.5 space-y-0.5">
-              <SubItem
-                label="Design Workflows"
-                active={selectedWorkflowId === firstDesign}
-                onClick={() => {
-                  onChangeTab?.("workflows");
-                  if (firstDesign) onSelectWorkflowId?.(firstDesign);
-                }}
-              />
-              <SubItem
-                label="Validation Workflows"
-                active={selectedWorkflowId === firstValidation}
-                onClick={() => {
-                  onChangeTab?.("workflows");
-                  if (firstValidation) onSelectWorkflowId?.(firstValidation);
-                }}
-              />
-              <SubItem
-                label="My Workflows"
-                active={selectedWorkflowId === firstMine}
-                onClick={() => {
-                  onChangeTab?.("workflows");
-                  if (firstMine) onSelectWorkflowId?.(firstMine);
-                }}
-              />
+              {workflows.length ? (
+                workflows.map((w) => (
+                  <SubItem
+                    key={w.id}
+                    label={w.title?.trim() ? w.title : "Untitled workflow"}
+                    active={selectedWorkflowId === w.id && activeTab === "workflows"}
+                    onClick={() => {
+                      setActiveTab("workflows");
+                      setSelectedWorkflowId(w.id);
+                    }}
+                  />
+                ))
+              ) : (
+                <div className="px-2 py-2 text-[12px] text-zinc-500">
+                  No workflows yet.
+                </div>
+              )}
 
-              <SubItem
-                label="Add new workflow"
-                icon={Plus}
-                onClick={() => {
-                  onChangeTab?.("workflows");
-                  onCreateWorkflow?.();
-                }}
-              />
+              <button
+                type="button"
+                onClick={() => createWorkflow()}
+                className="mt-1 w-full px-2 py-1.5 rounded-md text-left text-[12px] tracking-tight
+                           hover:bg-zinc-200/40 transition-colors flex items-center gap-2 text-zinc-700"
+              >
+                <Plus size={14} strokeWidth={1.8} className="text-zinc-600" />
+                Add new workflow
+              </button>
             </div>
           ) : null}
         </div>
@@ -215,7 +196,6 @@ export default function Sidebar({
                   "flex items-center gap-2"
                 )}
               >
-                <ModernCheckbox defaultChecked={t.done} />
                 <div
                   className={cx(
                     "text-[13px] tracking-tight",
@@ -228,15 +208,17 @@ export default function Sidebar({
             ))}
 
             {!tasks.length ? (
-              <div className="text-[12px] text-zinc-500 px-2 py-2">No tasks in this tab.</div>
+              <div className="text-[12px] text-zinc-500 px-2 py-2">
+                No tasks in this tab.
+              </div>
             ) : null}
           </div>
         </div>
 
         {/* footer */}
         <div className="mt-auto px-2 pt-4 space-y-0.5">
-          <NavItem icon={Settings} label="Settings" />
-          <NavItem icon={Trash2} label="Trash" />
+          <NavItem icon={Settings} label="Settings" onClick={() => {}} />
+          <NavItem icon={Trash2} label="Trash" onClick={() => {}} />
         </div>
       </div>
     </aside>

@@ -12,26 +12,78 @@ import {
 
 const DFMEAContext = createContext(null);
 
-export function DFMEAProvider({ children }) {
-  // Active “floating card” notice (ONLY ONE at a time)
+function makeId() {
+  return `wf-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+export function DFMEAProvider({ children, initialWorkflows = [] }) {
+  // -----------------------------
+  // ✅ Tab navigation
+  // -----------------------------
+  const [activeTab, setActiveTab] = useState("requirements");
+
+  // -----------------------------
+  // ✅ Workflows
+  // -----------------------------
+  const [workflows, setWorkflows] = useState(initialWorkflows);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(
+    initialWorkflows?.[0]?.id ?? ""
+  );
+
+  const createWorkflow = useCallback(() => {
+    const id = makeId();
+
+    const wf = {
+      id,
+      title: "Untitled workflow",
+      summary: "",
+      category: "custom",
+      owner: "me",
+      textSteps: [],
+      diagram: {
+        grid: 20,
+        zoom: 1,
+        pan: { x: 60, y: 60 },
+        nodes: [],
+        edges: []
+      }
+    };
+
+    setWorkflows((prev) => [...prev, wf]);
+    setSelectedWorkflowId(id);
+    setActiveTab("workflows");
+  }, []);
+
+  // ✅ accepts: (id, patch) OR (workflowObject)
+  const updateWorkflowLocal = useCallback((a, b) => {
+    // case 1: updateWorkflowLocal(workflowObject)
+    if (a && typeof a === "object" && a.id && b === undefined) {
+      const wf = a;
+      setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? { ...w, ...wf } : w)));
+      return;
+    }
+
+    // case 2: updateWorkflowLocal(id, patch)
+    const workflowId = a;
+    const patch = b;
+
+    if (!workflowId || !patch) return;
+
+    setWorkflows((prev) =>
+      prev.map((w) => (w.id === workflowId ? { ...w, ...patch } : w))
+    );
+  }, []);
+
+  // -----------------------------
+  // ✅ Your existing notice system
+  // -----------------------------
   const [activeNotice, setActiveNotice] = useState(null);
-
-  // History for TopNav “toast” panel (keep last 6)
   const [noticeHistory, setNoticeHistory] = useState([]);
-
-  // Track per-notice AI background analysis state
-  const [noticeAnalyzing, setNoticeAnalyzing] = useState({}); // { [noticeId]: boolean }
-
-  // Badge count in TopNav
+  const [noticeAnalyzing, setNoticeAnalyzing] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
-
   const timersRef = useRef([]);
 
-  // ✅ Requirements gating state
-  // "requirementsComplete" unlocks the other sheets normally
   const [requirementsComplete, setRequirementsComplete] = useState(false);
-
-  // "requirementsDevUnlocked" unlocks other sheets early when using dev option
   const [requirementsDevUnlocked, setRequirementsDevUnlocked] = useState(false);
 
   const cleanupTimers = useCallback(() => {
@@ -42,19 +94,14 @@ export function DFMEAProvider({ children }) {
   const pushChangeNotice = useCallback((notice) => {
     if (!notice?.noticeId) return;
 
-    // Set as the only active card
     setActiveNotice(notice);
 
-    // Add to TopNav history (dedupe)
     setNoticeHistory((prev) => {
       const next = [notice, ...prev.filter((n) => n.noticeId !== notice.noticeId)];
       return next.slice(0, 6);
     });
 
-    // Increase badge count (mock “unread”)
     setUnreadCount((c) => Math.min(c + 1, 9));
-
-    // Begin background AI analysis (5s mock)
     setNoticeAnalyzing((p) => ({ ...p, [notice.noticeId]: true }));
 
     const t = setTimeout(() => {
@@ -64,15 +111,9 @@ export function DFMEAProvider({ children }) {
     timersRef.current.push(t);
   }, []);
 
-  const dismissActiveNotice = useCallback(() => {
-    setActiveNotice(null);
-  }, []);
+  const dismissActiveNotice = useCallback(() => setActiveNotice(null), []);
+  const markAllRead = useCallback(() => setUnreadCount(0), []);
 
-  const markAllRead = useCallback(() => {
-    setUnreadCount(0);
-  }, []);
-
-  // ✅ Gating helpers
   const unlockFromRequirementsListView = useCallback(() => {
     setRequirementsDevUnlocked(true);
   }, []);
@@ -84,6 +125,19 @@ export function DFMEAProvider({ children }) {
 
   const value = useMemo(
     () => ({
+      // ✅ tabs
+      activeTab,
+      setActiveTab,
+
+      // ✅ workflows
+      workflows,
+      setWorkflows,
+      selectedWorkflowId,
+      setSelectedWorkflowId,
+      createWorkflow,
+      updateWorkflowLocal,
+
+      // ✅ notices
       activeNotice,
       noticeHistory,
       noticeAnalyzing,
@@ -93,7 +147,7 @@ export function DFMEAProvider({ children }) {
       markAllRead,
       cleanupTimers,
 
-      // ✅ expose gating state
+      // ✅ gating
       requirementsComplete,
       setRequirementsComplete,
       requirementsDevUnlocked,
@@ -101,6 +155,11 @@ export function DFMEAProvider({ children }) {
       resetRequirementsUnlocks
     }),
     [
+      activeTab,
+      workflows,
+      selectedWorkflowId,
+      createWorkflow,
+      updateWorkflowLocal,
       activeNotice,
       noticeHistory,
       noticeAnalyzing,

@@ -93,9 +93,5 @@ def main(exclude_names: set[str] | None = None):
 
 if __name__ == "__main__":
     # Default excludes for now:
-    main(
-        exclude_names={
-            "RequirementsViewport.js",
-            "ProcessForceGraph.js",
-        }
-    )
+    main()
+       
