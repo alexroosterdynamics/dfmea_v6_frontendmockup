@@ -30,7 +30,6 @@ import { useDFMEA } from "@/contexts/Context";
 // ✅ visual-only design system
 import {
   WF_GRID,
-  WF_CANVAS,
   wfGetEdgeStroke,
   wfNodeShellClass,
   wfNodeLabelClass,
@@ -41,7 +40,18 @@ import {
   wfDecisionDiamond,
   wfConditionDiamond,
   wfHintOverlayClass,
-  wfBackgroundGrid
+  wfBackgroundGrid,
+
+  // ✅ NEW: popover cosmetics moved here
+  wfNodePopoverStyle,
+  wfNodePopoverContainerClass,
+  wfNodePopoverTitleClass,
+  wfNodePopoverMetaTextClass,
+  wfNodePopoverSectionLabelClass,
+  wfNodePopoverInputClass,
+  wfNodePopoverTextareaClass,
+  wfNodePopoverHintClass,
+  wfNodePopoverEmptyHintClass
 } from "@/lib/workflowVisuals";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
@@ -81,27 +91,115 @@ function getHandlesForType(type) {
   }
 }
 
-/* ============================== NODE ============================== */
-function ProcessNode({ id, data, selected }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(data.label);
-
-  useEffect(() => setEditValue(data.label), [data.label]);
-
-  const commit = () => {
-    setIsEditing(false);
-    const next = editValue.trim();
-    if (next) data.onUpdateLabel(id, next);
-    else setEditValue(data.label);
-  };
-
-  const cancel = () => {
-    setIsEditing(false);
-    setEditValue(data.label);
-  };
+/* ============================== NODE POPOVER (VIEW + EDIT) ============================== */
+function NodePopover({
+  pinned,
+  title,
+  subtitle,
+  detail,
+  onChangeTitle,
+  onChangeSubtitle,
+  onChangeDetail
+}) {
+  const hasExtra = Boolean((subtitle || "").trim() || (detail || "").trim());
 
   return (
-    <div className="group relative" style={{ width: GRID.NODE_WIDTH }}>
+    <div
+      className={wfNodePopoverContainerClass({ pinned })}
+      style={wfNodePopoverStyle}
+    >
+      <div className={wfNodePopoverTitleClass}>{title || "Step"}</div>
+
+      {pinned ? (
+        <div className="mt-2 grid gap-2">
+          <div>
+            <div className={wfNodePopoverSectionLabelClass}>Title</div>
+            <input
+              value={title || ""}
+              onChange={(e) => onChangeTitle?.(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className={wfNodePopoverInputClass}
+              placeholder="Step title..."
+            />
+          </div>
+
+          <div>
+            <div className={wfNodePopoverSectionLabelClass}>Subtitle</div>
+            <input
+              value={subtitle || ""}
+              onChange={(e) => onChangeSubtitle?.(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className={wfNodePopoverInputClass}
+              placeholder="Short subtitle..."
+            />
+          </div>
+
+          <div>
+            <div className={wfNodePopoverSectionLabelClass}>Description</div>
+            <textarea
+              value={detail || ""}
+              onChange={(e) => onChangeDetail?.(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              rows={4}
+              className={wfNodePopoverTextareaClass}
+              placeholder="Explain what this step does, output, notes..."
+            />
+          </div>
+
+          <div className={wfNodePopoverHintClass}>Tip: click outside to close</div>
+        </div>
+      ) : (
+        <>
+          {subtitle?.trim() ? (
+            <div className={wfNodePopoverMetaTextClass}>{subtitle}</div>
+          ) : null}
+
+          {detail?.trim() ? (
+            <div className={wfNodePopoverMetaTextClass} style={{ whiteSpace: "pre-wrap" }}>
+              {detail}
+            </div>
+          ) : null}
+
+          {!hasExtra ? (
+            <div className={wfNodePopoverEmptyHintClass}>Click node to add details</div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================== NODE ============================== */
+function ProcessNode({ id, data, selected }) {
+  const [isEditingInlineTitle, setIsEditingInlineTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(data.label);
+
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => setTitleValue(data.label), [data.label]);
+
+  const commitInlineTitle = () => {
+    setIsEditingInlineTitle(false);
+    const next = titleValue.trim();
+    if (next) data.onUpdateLabel?.(id, next);
+    else setTitleValue(data.label);
+  };
+
+  const cancelInlineTitle = () => {
+    setIsEditingInlineTitle(false);
+    setTitleValue(data.label);
+  };
+
+  const pinned = Boolean(data.isPinned);
+  const showPopover = hovered || pinned;
+
+  return (
+    <div
+      className="group relative"
+      style={{ width: GRID.NODE_WIDTH }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* Hidden handles */}
       <Handle id="l" type="source" position={Position.Left} style={{ opacity: 0 }} />
       <Handle id="r" type="source" position={Position.Right} style={{ opacity: 0 }} />
@@ -113,22 +211,35 @@ function ProcessNode({ id, data, selected }) {
       <Handle id="t" type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle id="b" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
 
+      {/* ✅ Hover + pinned popover */}
+      {showPopover ? (
+        <NodePopover
+          pinned={pinned}
+          title={data.label}
+          subtitle={data.subtitle}
+          detail={data.detail}
+          onChangeTitle={(v) => data.onUpdateLabel?.(id, v)}
+          onChangeSubtitle={(v) => data.onUpdateSubtitle?.(id, v)}
+          onChangeDetail={(v) => data.onUpdateDetail?.(id, v)}
+        />
+      ) : null}
+
       <div
         onDoubleClick={(e) => {
           e.stopPropagation();
-          setIsEditing(true);
+          setIsEditingInlineTitle(true);
         }}
-        className={wfNodeShellClass({ selected })}
+        className={wfNodeShellClass({ selected: selected || pinned })}
       >
-        {isEditing ? (
+        {isEditingInlineTitle ? (
           <input
             autoFocus
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commit}
+            value={titleValue}
+            onChange={(e) => setTitleValue(e.target.value)}
+            onBlur={commitInlineTitle}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commit();
-              if (e.key === "Escape") cancel();
+              if (e.key === "Enter") commitInlineTitle();
+              if (e.key === "Escape") cancelInlineTitle();
             }}
             className="w-full bg-transparent text-center outline-none"
             onClick={(e) => e.stopPropagation()}
@@ -203,7 +314,14 @@ function SubStepEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
   const stroke = wfGetEdgeStroke(CONNECTION_TYPES.SUBSTEP);
   const d = `M ${sourceX} ${sourceY} L ${sourceX} ${targetY} L ${targetX} ${targetY}`;
   return (
-    <path d={d} stroke={stroke} strokeWidth="2" strokeDasharray="6,4" fill="none" markerEnd={markerEnd} />
+    <path
+      d={d}
+      stroke={stroke}
+      strokeWidth="2"
+      strokeDasharray="6,4"
+      fill="none"
+      markerEnd={markerEnd}
+    />
   );
 }
 
@@ -281,7 +399,6 @@ function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
   const diamondX = sourceX + 35;
   const diamondY = sourceY;
   const diamondSize = 14;
-
   const bendX = diamondX + diamondSize + 20;
 
   const toDiamond = `M ${sourceX} ${sourceY} L ${diamondX - diamondSize} ${diamondY}`;
@@ -296,7 +413,14 @@ function ConditionEdge({ sourceX, sourceY, targetX, targetY, markerEnd }) {
         stroke={wfConditionDiamond.stroke}
         strokeWidth={wfConditionDiamond.strokeWidth}
       />
-      <text x={diamondX} y={diamondY + 4} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">
+      <text
+        x={diamondX}
+        y={diamondY + 4}
+        textAnchor="middle"
+        fill="white"
+        fontSize="10"
+        fontWeight="bold"
+      >
         ?
       </text>
 
@@ -320,6 +444,7 @@ function buildInternalFromDiagram(diagram) {
       position: pos,
       data: {
         label: n.title || "Step",
+        subtitle: n.subtitle || "",
         detail: n.detail || "",
         gridX,
         gridY,
@@ -355,7 +480,10 @@ function exportDiagramFromInternal(internalNodes, viewport) {
     y: Math.round(n.position.y),
     w: n.data.w ?? 260,
     h: n.data.h ?? 80,
+
+    // ✅ persisted node fields
     title: n.data.label || "Step",
+    subtitle: n.data.subtitle || "",
     detail: n.data.detail || ""
   }));
 
@@ -388,12 +516,17 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
   const rf = useReactFlow();
 
   const [nodes, setNodes] = useState(() => buildInternalFromDiagram(initialDiagram));
+
   const [editingEdgeId, setEditingEdgeId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
+
+  // ✅ pinned popover id
+  const [pinnedNodeId, setPinnedNodeId] = useState(null);
 
   useEffect(() => {
     setNodes(buildInternalFromDiagram(initialDiagram));
     setEditingEdgeId(null);
+    setPinnedNodeId(null);
 
     const z = initialDiagram?.zoom ?? 1;
     const p = initialDiagram?.pan ?? { x: 60, y: 60 };
@@ -402,7 +535,21 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
   }, [workflowId]);
 
   const onUpdateLabel = useCallback((nodeId, label) => {
-    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n)));
+    setNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n))
+    );
+  }, []);
+
+  const onUpdateSubtitle = useCallback((nodeId, subtitle) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, subtitle } } : n))
+    );
+  }, []);
+
+  const onUpdateDetail = useCallback((nodeId, detail) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, detail } } : n))
+    );
   }, []);
 
   const onDeleteNode = useCallback((nodeId) => {
@@ -416,6 +563,8 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
         }
       }));
     });
+
+    setPinnedNodeId((cur) => (cur === nodeId ? null : cur));
   }, []);
 
   const pushNodesDown = useCallback((fromGridY, excludeIds = []) => {
@@ -564,6 +713,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
           position: newPos,
           data: {
             label: "Step",
+            subtitle: "",
             detail: "",
             gridX,
             gridY,
@@ -669,12 +819,19 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
       style: { width: GRID.NODE_WIDTH, height: GRID.NODE_HEIGHT },
       data: {
         ...n.data,
+
+        // ✅ pin logic
+        isPinned: pinnedNodeId === n.id,
+
+        // ✅ callbacks
         onAddConnection: addConnection,
         onUpdateLabel,
+        onUpdateSubtitle,
+        onUpdateDetail,
         onDeleteNode
       }
     }));
-  }, [nodes, addConnection, onUpdateLabel, onDeleteNode]);
+  }, [nodes, pinnedNodeId, addConnection, onUpdateLabel, onUpdateSubtitle, onUpdateDetail, onDeleteNode]);
 
   useImperativeHandle(ref, () => ({
     ensureStartNodeIfEmpty() {
@@ -689,6 +846,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
             position: gridToPixel(startGX, startGY),
             data: {
               label: "Start",
+              subtitle: "",
               detail: "",
               gridX: startGX,
               gridY: startGY,
@@ -717,15 +875,26 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
         edgeTypes={edgeTypes}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={true}
+        elementsSelectable={false} // ✅ we control "selection" via pinned state
         fitView={false}
         defaultViewport={{ x: 60, y: 60, zoom: 1 }}
-        panOnDrag={[1, 2]}
-        panActivationKeyCode="Alt"
+
+        // ✅ LEFT CLICK panning
+        panOnDrag={true}
+        panActivationKeyCode={null}
         selectionOnDrag={false}
+
+        // ✅ pin / unpin behavior
+        onNodeClick={(_, node) => setPinnedNodeId(node?.id || null)}
+        onPaneClick={() => setPinnedNodeId(null)}
+
         className="bg-transparent"
       >
-        <Background gap={wfBackgroundGrid.gap} size={wfBackgroundGrid.size} color={wfBackgroundGrid.color} />
+        <Background
+          gap={wfBackgroundGrid.gap}
+          size={wfBackgroundGrid.size}
+          color={wfBackgroundGrid.color}
+        />
 
         {editingEdgeId ? (
           <EdgeLabelRenderer>
@@ -758,7 +927,7 @@ const WorkflowFlowEditor = forwardRef(function WorkflowFlowEditor(
       </ReactFlow>
 
       <div className={wfHintOverlayClass}>
-        💡 Click icons to add connections • Click decision labels to edit • Alt+drag to pan
+        💡 Click a node to edit details • Click icons to add connections • Drag to pan
       </div>
     </>
   );
@@ -773,7 +942,11 @@ const DiagramContainer = memo(
         style={{ height }}
       >
         <ReactFlowProvider>
-          <WorkflowFlowEditor ref={ref} workflowId={workflowId} initialDiagram={initialDiagram} />
+          <WorkflowFlowEditor
+            ref={ref}
+            workflowId={workflowId}
+            initialDiagram={initialDiagram}
+          />
         </ReactFlowProvider>
       </div>
     );
@@ -959,7 +1132,6 @@ export default function Workflows() {
             {saving ? "Saving..." : "Save"}
           </button>
 
-          {/* ✅ NEW: Delete workflow */}
           <button
             onClick={handleDeleteActiveWorkflow}
             disabled={!activeWorkflow}
@@ -1010,7 +1182,9 @@ export default function Workflows() {
             <div className="text-[11px] text-zinc-500 tracking-tight">Workflow title</div>
             <input
               value={activeWorkflow.title || ""}
-              onChange={(e) => updateWorkflowLocal(activeWorkflow.id, { title: e.target.value })}
+              onChange={(e) =>
+                updateWorkflowLocal(activeWorkflow.id, { title: e.target.value })
+              }
               className="mt-1 w-full rounded-xl border border-zinc-200/80 bg-white px-3 py-2
                          text-[13px] tracking-tight text-zinc-900 outline-none
                          focus:ring-2 focus:ring-zinc-300"
@@ -1022,7 +1196,9 @@ export default function Workflows() {
             <div className="text-[11px] text-zinc-500 tracking-tight">Summary</div>
             <input
               value={activeWorkflow.summary || ""}
-              onChange={(e) => updateWorkflowLocal(activeWorkflow.id, { summary: e.target.value })}
+              onChange={(e) =>
+                updateWorkflowLocal(activeWorkflow.id, { summary: e.target.value })
+              }
               className="mt-1 w-full rounded-xl border border-zinc-200/80 bg-white px-3 py-2
                          text-[13px] tracking-tight text-zinc-900 outline-none
                          focus:ring-2 focus:ring-zinc-300"

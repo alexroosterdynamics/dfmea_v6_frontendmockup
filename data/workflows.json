@@ -1,22 +1,394 @@
 {
   "tabId": "workflows",
-  "title": "Workflows",
+  "title": "Engineering Workflows",
   "meta": {
     "visibility": "Team space",
     "edited": "Edited just now"
   },
-  "tasksTitle": "Workflow Tasks",
+  "tasksTitle": "DFMEA Task List",
   "tasks": [],
   "assistant": {
-    "welcome": "Welcome to Workflows. Create SOP-style diagrams your team uses to standardize DFMEA execution.",
+    "welcome": "Welcome to the DFMEA Standard Operating Procedure. This workflow guides the team through system decomposition, risk assessment, and design optimization.",
     "suggestedPrompts": [
-      "Summarize this workflow as a checklist",
-      "Where should DFMEA gates be added?",
-      "Suggest improvements for robustness",
-      "Generate a validation workflow draft"
+      "Summarize this DFMEA as a checklist",
+      "Where should safety gates be added?",
+      "Suggest improvements for detection controls",
+      "Generate a validation report template"
     ]
   },
   "content": {
-    "workflows": []
+    "workflows": [
+      {
+        "id": "b8fcac08-2045-480d-954f-a8e080d988a1",
+        "category": "custom",
+        "owner": "me",
+        "title": "Standard DFMEA Process (AIAG-VDA)",
+        "summary": "A systematic approach to identifying potential design failures and implementing preventative controls.",
+        "textSteps": [],
+        "diagram": {
+          "grid": 20,
+          "zoom": 0.7578582832551992,
+          "pan": {
+            "x": -295.65148661334933,
+            "y": -126.31066524681279
+          },
+          "nodes": [
+            {
+              "id": "start",
+              "type": "start",
+              "x": 540,
+              "y": 90,
+              "w": 260,
+              "h": 80,
+              "title": "1. Project Scope & Planning",
+              "subtitle": "Planning Phase",
+              "detail": "Define boundaries, team members, and project milestones using the 5T method."
+            },
+            {
+              "id": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e",
+              "x": 540,
+              "y": 180,
+              "w": 260,
+              "h": 80,
+              "title": "2. Structure Analysis",
+              "subtitle": "System Decomposition",
+              "detail": "Break down the design into System, Sub-system, and Component levels using a Block Diagram."
+            },
+            {
+              "id": "e95a5a75-068f-42b4-a159-a39e099e8741",
+              "x": 720,
+              "y": 270,
+              "w": 260,
+              "h": 80,
+              "title": "3. Function Analysis",
+              "subtitle": "Requirements Mapping",
+              "detail": "Associate functions and requirements to each structural element identified in Step 2."
+            },
+            {
+              "id": "76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "x": 540,
+              "y": 810,
+              "w": 260,
+              "h": 80,
+              "title": "4. Failure Analysis",
+              "subtitle": "Identifying Failure Modes",
+              "detail": "Identify potential failure modes, effects, and causes for each design function."
+            },
+            {
+              "id": "7b9ee914-afd2-4750-8770-12c0fb1ab514",
+              "x": 720,
+              "y": 1350,
+              "w": 260,
+              "h": 80,
+              "title": "Failure Chain Review",
+              "subtitle": "Cause-Effect Link",
+              "detail": "Verify the logical link between Failure Cause -> Failure Mode -> Failure Effect."
+            },
+            {
+              "id": "8428c210-4a98-4a15-8070-858f1593885f",
+              "x": 720,
+              "y": 1440,
+              "w": 260,
+              "h": 80,
+              "title": "Customer Impact Study",
+              "subtitle": "End User Risk",
+              "detail": "Assess how the failure affects the vehicle, the user, and regulatory compliance."
+            },
+            {
+              "id": "0479eaf3-850d-45f5-b2c9-efc180242448",
+              "x": 1080,
+              "y": 270,
+              "w": 260,
+              "h": 80,
+              "title": "5. Risk Evaluation",
+              "subtitle": "S / O / D Scoring",
+              "detail": "Assign ratings for Severity (S), Occurrence (O), and Detection (D) based on standardized tables."
+            },
+            {
+              "id": "b138e134-5dd3-4143-9139-1eb33241b41d",
+              "x": 1440,
+              "y": 360,
+              "w": 260,
+              "h": 80,
+              "title": "High Action Priority (AP)",
+              "subtitle": "Urgent Mitigation",
+              "detail": "Identify items with high Severity and/or high Action Priority scores requiring immediate attention."
+            },
+            {
+              "id": "8a9e8f8f-2925-4b8e-93a9-1f60b35fd0c7",
+              "x": 1440,
+              "y": 630,
+              "w": 260,
+              "h": 80,
+              "title": "Medium Action Priority",
+              "subtitle": "Evaluation Required",
+              "detail": "Review design margins and current controls to see if further optimization is cost-effective."
+            },
+            {
+              "id": "e1031095-3d1c-46dd-aa91-0252109c3108",
+              "x": 1440,
+              "y": 720,
+              "w": 260,
+              "h": 80,
+              "title": "Low Action Priority",
+              "subtitle": "Risk Accepted",
+              "detail": "Risk is deemed acceptable; current controls are sufficient."
+            },
+            {
+              "id": "d47c82fb-796d-4aff-880b-21bb3a66cece",
+              "x": 900,
+              "y": 810,
+              "w": 260,
+              "h": 80,
+              "title": "6. Optimization",
+              "subtitle": "Mitigation Strategy",
+              "detail": "Define actions to reduce Severity, Occurrence, or increase Detection capability."
+            },
+            {
+              "id": "74f0a71f-bc22-4088-bd27-0bd37db10691",
+              "x": 1260,
+              "y": 900,
+              "w": 260,
+              "h": 80,
+              "title": "Physical Testing",
+              "subtitle": "Detection Control",
+              "detail": "Lab testing, durability cycles, or destructive testing to validate the failure point."
+            },
+            {
+              "id": "33a0fac8-151f-442b-8a49-72285503ff56",
+              "x": 1260,
+              "y": 1170,
+              "w": 260,
+              "h": 80,
+              "title": "Virtual Simulation",
+              "subtitle": "Prevention Control",
+              "detail": "Utilize FEA, CFD, or thermal modeling to prevent failure modes during the design phase."
+            },
+            {
+              "id": "ad4dac9d-2406-4ac9-b174-9fc7847dd86e",
+              "x": 1620,
+              "y": 900,
+              "w": 260,
+              "h": 80,
+              "title": "DVP&R Integration",
+              "subtitle": "Validation Plan",
+              "detail": "Incorporate detection actions into the formal Design Verification Plan and Report."
+            },
+            {
+              "id": "253c4f26-c664-4554-971b-b5c415372d1b",
+              "x": 1620,
+              "y": 1170,
+              "w": 260,
+              "h": 80,
+              "title": "Update Design Rules",
+              "subtitle": "Knowledge Capture",
+              "detail": "Update internal engineering standards to prevent recurrence in future programs."
+            },
+            {
+              "id": "17ff2163-9fa1-4a60-af4b-32d07d476435",
+              "x": 1620,
+              "y": 1260,
+              "w": 260,
+              "h": 80,
+              "title": "Standardization",
+              "subtitle": "Final Check",
+              "detail": "Apply findings to similar product families across the organization."
+            },
+            {
+              "id": "e5d5027e-158c-4276-bb9b-7871fbec7ff1",
+              "x": 1620,
+              "y": 990,
+              "w": 260,
+              "h": 80,
+              "title": "Re-evaluation of Risk",
+              "subtitle": "Residual Risk Check",
+              "detail": "Recalculate S/O/D after actions are implemented to ensure AP targets are met."
+            },
+            {
+              "id": "e5ea6a26-8d60-4bde-b05f-af638eb9523d",
+              "x": 1980,
+              "y": 1080,
+              "w": 260,
+              "h": 80,
+              "title": "7. Results Documentation",
+              "subtitle": "Completion",
+              "detail": "Finalize DFMEA report, communicate results to management, and archive the baseline."
+            },
+            {
+              "id": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2",
+              "x": 1800,
+              "y": 450,
+              "w": 260,
+              "h": 80,
+              "title": "Corrective Action Loop",
+              "subtitle": "Redesign Phase",
+              "detail": "Cycle back to engineering for design modifications if AP remains High."
+            },
+            {
+              "id": "e16a094d-0431-4cd4-ab88-faa579c5aa2c",
+              "x": 1980,
+              "y": 540,
+              "w": 260,
+              "h": 80,
+              "title": "Geometry Modification",
+              "subtitle": "Structural Change",
+              "detail": "Alter physical dimensions to reduce stress concentrations or interference."
+            },
+            {
+              "id": "6d06d9b5-4314-4e21-8f5a-971735d19851",
+              "x": 2160,
+              "y": 450,
+              "w": 260,
+              "h": 80,
+              "title": "Material Substitution",
+              "subtitle": "Properties Change",
+              "detail": "Select materials with higher thermal, chemical, or mechanical resistance."
+            }
+          ],
+          "edges": [
+            {
+              "id": "start-98c20cae-7a60-4bc1-b5a7-abd111d2c43e",
+              "from": "start",
+              "to": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e",
+              "type": "parallel",
+              "label": ""
+            },
+            {
+              "id": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e-e95a5a75-068f-42b4-a159-a39e099e8741",
+              "from": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e",
+              "to": "e95a5a75-068f-42b4-a159-a39e099e8741",
+              "type": "substep",
+              "label": ""
+            },
+            {
+              "id": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e-76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "from": "98c20cae-7a60-4bc1-b5a7-abd111d2c43e",
+              "to": "76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "type": "parallel",
+              "label": ""
+            },
+            {
+              "id": "e95a5a75-068f-42b4-a159-a39e099e8741-0479eaf3-850d-45f5-b2c9-efc180242448",
+              "from": "e95a5a75-068f-42b4-a159-a39e099e8741",
+              "to": "0479eaf3-850d-45f5-b2c9-efc180242448",
+              "type": "series",
+              "label": ""
+            },
+            {
+              "id": "76fb5df7-30b1-42c2-af66-dc0f330912fa-7b9ee914-afd2-4750-8770-12c0fb1ab514",
+              "from": "76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "to": "7b9ee914-afd2-4750-8770-12c0fb1ab514",
+              "type": "substep",
+              "label": ""
+            },
+            {
+              "id": "76fb5df7-30b1-42c2-af66-dc0f330912fa-8428c210-4a98-4a15-8070-858f1593885f",
+              "from": "76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "to": "8428c210-4a98-4a15-8070-858f1593885f",
+              "type": "substep",
+              "label": ""
+            },
+            {
+              "id": "76fb5df7-30b1-42c2-af66-dc0f330912fa-d47c82fb-796d-4aff-880b-21bb3a66cece",
+              "from": "76fb5df7-30b1-42c2-af66-dc0f330912fa",
+              "to": "d47c82fb-796d-4aff-880b-21bb3a66cece",
+              "type": "series",
+              "label": ""
+            },
+            {
+              "id": "0479eaf3-850d-45f5-b2c9-efc180242448-b138e134-5dd3-4143-9139-1eb33241b41d",
+              "from": "0479eaf3-850d-45f5-b2c9-efc180242448",
+              "to": "b138e134-5dd3-4143-9139-1eb33241b41d",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "0479eaf3-850d-45f5-b2c9-efc180242448-8a9e8f8f-2925-4b8e-93a9-1f60b35fd0c7",
+              "from": "0479eaf3-850d-45f5-b2c9-efc180242448",
+              "to": "8a9e8f8f-2925-4b8e-93a9-1f60b35fd0c7",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "0479eaf3-850d-45f5-b2c9-efc180242448-e1031095-3d1c-46dd-aa91-0252109c3108",
+              "from": "0479eaf3-850d-45f5-b2c9-efc180242448",
+              "to": "e1031095-3d1c-46dd-aa91-0252109c3108",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "b138e134-5dd3-4143-9139-1eb33241b41d-1e88f038-de13-4ebe-8f5b-1f462eeb3dd2",
+              "from": "b138e134-5dd3-4143-9139-1eb33241b41d",
+              "to": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "d47c82fb-796d-4aff-880b-21bb3a66cece-74f0a71f-bc22-4088-bd27-0bd37db10691",
+              "from": "d47c82fb-796d-4aff-880b-21bb3a66cece",
+              "to": "74f0a71f-bc22-4088-bd27-0bd37db10691",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "d47c82fb-796d-4aff-880b-21bb3a66cece-33a0fac8-151f-442b-8a49-72285503ff56",
+              "from": "d47c82fb-796d-4aff-880b-21bb3a66cece",
+              "to": "33a0fac8-151f-442b-8a49-72285503ff56",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "74f0a71f-bc22-4088-bd27-0bd37db10691-ad4dac9d-2406-4ac9-b174-9fc7847dd86e",
+              "from": "74f0a71f-bc22-4088-bd27-0bd37db10691",
+              "to": "ad4dac9d-2406-4ac9-b174-9fc7847dd86e",
+              "type": "series",
+              "label": ""
+            },
+            {
+              "id": "33a0fac8-151f-442b-8a49-72285503ff56-253c4f26-c664-4554-971b-b5c415372d1b",
+              "from": "33a0fac8-151f-442b-8a49-72285503ff56",
+              "to": "253c4f26-c664-4554-971b-b5c415372d1b",
+              "type": "series",
+              "label": ""
+            },
+            {
+              "id": "ad4dac9d-2406-4ac9-b174-9fc7847dd86e-e5d5027e-158c-4276-bb9b-7871fbec7ff1",
+              "from": "ad4dac9d-2406-4ac9-b174-9fc7847dd86e",
+              "to": "e5d5027e-158c-4276-bb9b-7871fbec7ff1",
+              "type": "parallel",
+              "label": ""
+            },
+            {
+              "id": "253c4f26-c664-4554-971b-b5c415372d1b-17ff2163-9fa1-4a60-af4b-32d07d476435",
+              "from": "253c4f26-c664-4554-971b-b5c415372d1b",
+              "to": "17ff2163-9fa1-4a60-af4b-32d07d476435",
+              "type": "parallel",
+              "label": ""
+            },
+            {
+              "id": "e5d5027e-158c-4276-bb9b-7871fbec7ff1-e5ea6a26-8d60-4bde-b05f-af638eb9523d",
+              "from": "e5d5027e-158c-4276-bb9b-7871fbec7ff1",
+              "to": "e5ea6a26-8d60-4bde-b05f-af638eb9523d",
+              "type": "condition",
+              "label": ""
+            },
+            {
+              "id": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2-e16a094d-0431-4cd4-ab88-faa579c5aa2c",
+              "from": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2",
+              "to": "e16a094d-0431-4cd4-ab88-faa579c5aa2c",
+              "type": "substep",
+              "label": ""
+            },
+            {
+              "id": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2-6d06d9b5-4314-4e21-8f5a-971735d19851",
+              "from": "1e88f038-de13-4ebe-8f5b-1f462eeb3dd2",
+              "to": "6d06d9b5-4314-4e21-8f5a-971735d19851",
+              "type": "series",
+              "label": ""
+            }
+          ]
+        }
+      }
+    ]
   }
 }
