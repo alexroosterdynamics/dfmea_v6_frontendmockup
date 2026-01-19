@@ -2,11 +2,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { FileText, GitBranch, Search as SearchIcon, Workflow, CalendarDays } from "lucide-react";
+import { FileText, GitBranch, Search as SearchIcon, Workflow } from "lucide-react";
 
 import RequirementsViewport from "./RequirementsViewport";
-import RequirementsManagerViewport from "./RequirementsManagerViewport";
-import TasksTimelineViewport from "./TasksTimelineViewport"; // ✅ NEW
 import ProcessDiagramViewport from "./ProcessDiagramViewport";
 import RootCauseViewport from "./RootCauseViewport";
 import Workflows from "./Workflows";
@@ -26,8 +24,6 @@ export default function Workspace({
 
   const Viewport = useMemo(() => {
     if (tabData.tabId === "requirements") return RequirementsViewport;
-    if (tabData.tabId === "requirementsManager") return RequirementsManagerViewport;
-    if (tabData.tabId === "tasksTimeline") return TasksTimelineViewport; // ✅ NEW
     if (tabData.tabId === "processDiagram") return ProcessDiagramViewport;
     if (tabData.tabId === "workflows") return Workflows;
     return RootCauseViewport;
@@ -35,8 +31,6 @@ export default function Workspace({
 
   const Icon = useMemo(() => {
     if (tabData.tabId === "requirements") return FileText;
-    if (tabData.tabId === "requirementsManager") return FileText;
-    if (tabData.tabId === "tasksTimeline") return CalendarDays; // ✅ NEW
     if (tabData.tabId === "processDiagram") return GitBranch;
     if (tabData.tabId === "workflows") return Workflow;
     return SearchIcon;

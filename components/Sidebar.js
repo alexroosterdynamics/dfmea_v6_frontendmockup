@@ -12,7 +12,8 @@ import {
   Search,
   ChevronDown,
   GitBranch,
-  Plus
+  Plus,
+  ClipboardList
 } from "lucide-react";
 
 import { useDFMEA } from "@/contexts/Context";
@@ -38,12 +39,6 @@ function NavItem({ icon: Icon, label, active, onClick, right }) {
   );
 }
 
-/**
- * ✅ SubItem must NOT be a <button> if it contains another <button>.
- * Otherwise you get: <button> cannot be a descendant of <button>.
- *
- * So this is a div with role="button" (keyboard accessible).
- */
 function SubItem({ label, onClick, active, right }) {
   return (
     <div
@@ -70,7 +65,12 @@ function SubItem({ label, onClick, active, right }) {
   );
 }
 
-export default function Sidebar({ tasksTitle, tasks = [] }) {
+export default function Sidebar({
+  tasksTitle,
+  tasks = [],
+  onOpenRequirementsManager,
+  onOpenTasksTimeline // ✅ NEW
+}) {
   const {
     activeTab,
     setActiveTab,
@@ -81,8 +81,8 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
     deleteWorkflow
   } = useDFMEA();
 
-  // ✅ collapsed by default
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
 
   const rightChevron = useMemo(
     () => (
@@ -96,6 +96,17 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
       />
     ),
     [workflowsOpen]
+  );
+
+  const inboxChevron = useMemo(
+    () => (
+      <ChevronDown
+        size={16}
+        strokeWidth={1.8}
+        className={cx("text-zinc-500 transition-transform", inboxOpen ? "rotate-0" : "-rotate-90")}
+      />
+    ),
+    [inboxOpen]
   );
 
   return (
@@ -146,14 +157,32 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
             active={activeTab === "ai"}
             onClick={() => setActiveTab("ai")}
           />
+
+          {/* Inbox group */}
           <NavItem
             icon={Inbox}
             label="Inbox"
-            active={activeTab === "inbox"}
-            onClick={() => setActiveTab("inbox")}
+            active={inboxOpen}
+            right={inboxChevron}
+            onClick={() => setInboxOpen((v) => !v)}
           />
 
-          {/* ✅ Workflows: expand/collapse menu */}
+          {inboxOpen ? (
+            <div className="pl-6 mt-0.5 space-y-0.5">
+              <SubItem
+                label="Manager view"
+                active={activeTab === "requirementsManager"}
+                onClick={() => onOpenRequirementsManager?.()}
+                right={
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-200/70 bg-white text-zinc-500">
+                    Read-only
+                  </span>
+                }
+              />
+            </div>
+          ) : null}
+
+          {/* Workflows */}
           <NavItem
             icon={GitBranch}
             label="Workflows"
@@ -183,9 +212,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
                           e.stopPropagation();
 
                           const ok = window.confirm(
-                            `Delete workflow "${
-                              w.title?.trim() ? w.title : "Untitled workflow"
-                            }"?`
+                            `Delete workflow "${w.title?.trim() ? w.title : "Untitled workflow"}"?`
                           );
                           if (!ok) return;
 
@@ -203,9 +230,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
                   />
                 ))
               ) : (
-                <div className="px-2 py-2 text-[12px] text-zinc-500">
-                  No workflows yet.
-                </div>
+                <div className="px-2 py-2 text-[12px] text-zinc-500">No workflows yet.</div>
               )}
 
               <button
@@ -223,8 +248,25 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
 
         {/* tasks */}
         <div className="mt-5 px-2">
-          <div className="text-[11px] font-medium text-zinc-500 tracking-tight">
-            {tasksTitle || "Tasks"}
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-medium text-zinc-500 tracking-tight">
+              {tasksTitle || "Tasks"}
+            </div>
+
+            {/* ✅ NEW: open detailed tasks sheet */}
+            <button
+              type="button"
+              onClick={() => onOpenTasksTimeline?.()}
+              className={cx(
+                "h-7 px-2 rounded-lg border border-zinc-200/80 bg-white",
+                "text-[11px] text-zinc-700 inline-flex items-center gap-1.5",
+                "hover:bg-zinc-100 transition-colors"
+              )}
+              title="Open detailed tasks view"
+            >
+              <ClipboardList size={14} strokeWidth={1.8} className="text-zinc-600" />
+              View
+            </button>
           </div>
 
           <div className="mt-2 space-y-1">
@@ -249,9 +291,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
             ))}
 
             {!tasks.length ? (
-              <div className="text-[12px] text-zinc-500 px-2 py-2">
-                No tasks in this tab.
-              </div>
+              <div className="text-[12px] text-zinc-500 px-2 py-2">No tasks in this tab.</div>
             ) : null}
           </div>
         </div>

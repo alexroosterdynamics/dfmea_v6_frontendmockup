@@ -10,7 +10,6 @@ import requirementsJson from "../data/requirements.json";
 import processDiagram from "../data/processDiagram.json";
 import rootCauseAnalysis from "../data/rootCauseAnalysis.json";
 import workflowsJson from "../data/workflows.json";
-import tasksTimelineJson from "../data/tasks.json"; // ✅ NEW
 
 import { DFMEAProvider, useDFMEA } from "../contexts/Context";
 
@@ -28,6 +27,7 @@ function AppShell({ requirementsData, setRequirementsData }) {
 
   const tabDataMap = useMemo(
     () => ({
+      // ✅ normal requirements
       requirements: requirementsData,
 
       // ✅ manager view "sheet" (NOT in TopNav toggle)
@@ -41,9 +41,6 @@ function AppShell({ requirementsData, setRequirementsData }) {
           edited: "Frozen snapshot"
         }
       },
-
-      // ✅ new tasks timeline sheet (NOT in TopNav toggle)
-      tasksTimeline: tasksTimelineJson,
 
       processDiagram,
       rootCauseAnalysis,
@@ -120,11 +117,6 @@ function AppShell({ requirementsData, setRequirementsData }) {
               // ✅ open manager view but keep TopNav highlighted on Requirements
               setActiveTab("requirementsManager");
               setActiveSheetTab("requirements");
-            }}
-            onOpenTasksTimeline={() => {
-              // ✅ open tasks timeline but keep TopNav highlighted where you were
-              setActiveTab("tasksTimeline");
-              // do NOT change activeSheetTab
             }}
           />
 

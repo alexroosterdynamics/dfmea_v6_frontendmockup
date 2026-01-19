@@ -1,0 +1,209 @@
+{
+    "tabId": "tasksTimeline",
+    "title": "Tasks • Timeline View",
+    "meta": {
+        "visibility": "Workspace • read-only planning",
+        "edited": "Just now"
+    },
+    "assistant": {
+        "welcome": "Welcome to Tasks. I can help you summarize, find blockers, and generate timelines or action plans.",
+        "suggestedPrompts": [
+            "Show me all blocked tasks and why they are blocked",
+            "What is at risk before the DFMEA Review milestone?",
+            "Summarize progress per lane",
+            "Generate a weekly plan to hit Release Candidate"
+        ]
+    },
+    "content": {
+        "projectName": "DFMEA Project • Control ECU",
+        "range": {
+            "start": "2026-01-06",
+            "end": "2026-02-28"
+        },
+        "lanes": [
+            {
+                "id": "lane-req",
+                "title": "Requirements",
+                "ownerGroup": "Systems"
+            },
+            {
+                "id": "lane-risk",
+                "title": "Risk & DFMEA",
+                "ownerGroup": "Safety"
+            },
+            {
+                "id": "lane-test",
+                "title": "Verification",
+                "ownerGroup": "Test"
+            },
+            {
+                "id": "lane-release",
+                "title": "Release Gate",
+                "ownerGroup": "Program"
+            }
+        ],
+        "milestones": [
+            {
+                "id": "ms-1",
+                "title": "Requirements Freeze",
+                "date": "2026-01-23",
+                "tone": "good"
+            },
+            {
+                "id": "ms-2",
+                "title": "DFMEA Review",
+                "date": "2026-02-07",
+                "tone": "neutral"
+            },
+            {
+                "id": "ms-3",
+                "title": "Release Candidate",
+                "date": "2026-02-21",
+                "tone": "bad"
+            }
+        ],
+        "tasks": [
+            {
+                "id": "TSK-001",
+                "title": "Finalize acceptance criteria for brownout recovery",
+                "description": "Add measurable recovery time and voltage range targets. Include test method reference and edge conditions for startup and aging.",
+                "status": "in_progress",
+                "priority": "High",
+                "owner": {
+                    "role": "Systems",
+                    "name": "You"
+                },
+                "laneId": "lane-req",
+                "start": "2026-01-08",
+                "end": "2026-01-18",
+                "percentComplete": 70,
+                "tags": [
+                    "traceability",
+                    "numeric targets",
+                    "power"
+                ],
+                "dependencies": [],
+                "updatedAt": "2026-01-19"
+            },
+            {
+                "id": "TSK-002",
+                "title": "Resolve flagged requirement ambiguity (REQ-004 / REQ-011)",
+                "description": "Rewrite with numeric constraints (units + tolerance). Add operating conditions (temperature, load) and define verification approach.",
+                "status": "blocked",
+                "priority": "High",
+                "owner": {
+                    "role": "Systems",
+                    "name": "Dana"
+                },
+                "laneId": "lane-req",
+                "start": "2026-01-12",
+                "end": "2026-01-20",
+                "percentComplete": 35,
+                "tags": [
+                    "AI guidance",
+                    "clarity",
+                    "units"
+                ],
+                "dependencies": [
+                    "TSK-001"
+                ],
+                "updatedAt": "2026-01-19"
+            },
+            {
+                "id": "TSK-003",
+                "title": "DFMEA linkage: map frozen requirements → systems/functions",
+                "description": "Create trace links for all frozen requirements to function set. Ensure no orphan requirements remain.",
+                "status": "todo",
+                "priority": "Medium",
+                "owner": {
+                    "role": "Safety",
+                    "name": "Kris"
+                },
+                "laneId": "lane-risk",
+                "start": "2026-01-21",
+                "end": "2026-02-03",
+                "percentComplete": 0,
+                "tags": [
+                    "trace",
+                    "linkage",
+                    "coverage"
+                ],
+                "dependencies": [
+                    "TSK-002"
+                ],
+                "updatedAt": "2026-01-19"
+            },
+            {
+                "id": "TSK-004",
+                "title": "Run change-notice impact review (top 3 notices)",
+                "description": "Evaluate potential downstream DFMEA effects and ensure proposed deltas do not invalidate verification assumptions.",
+                "status": "in_progress",
+                "priority": "Medium",
+                "owner": {
+                    "role": "Safety",
+                    "name": "Morgan"
+                },
+                "laneId": "lane-risk",
+                "start": "2026-01-15",
+                "end": "2026-01-24",
+                "percentComplete": 55,
+                "tags": [
+                    "change notice",
+                    "impact",
+                    "risk"
+                ],
+                "dependencies": [],
+                "updatedAt": "2026-01-19"
+            },
+            {
+                "id": "TSK-005",
+                "title": "Draft verification plan for recovery behavior",
+                "description": "Define test setup, instrumentation, acceptance thresholds, temperature sweep, and power cycle schedule.",
+                "status": "todo",
+                "priority": "High",
+                "owner": {
+                    "role": "Test",
+                    "name": "Sam"
+                },
+                "laneId": "lane-test",
+                "start": "2026-01-26",
+                "end": "2026-02-10",
+                "percentComplete": 0,
+                "tags": [
+                    "verification",
+                    "test plan",
+                    "criteria"
+                ],
+                "dependencies": [
+                    "TSK-001"
+                ],
+                "updatedAt": "2026-01-19"
+            },
+            {
+                "id": "TSK-006",
+                "title": "Build timeline pack for release gate review",
+                "description": "Summarize: frozen requirements count, flagged closures, verification readiness, and DFMEA linkage completeness.",
+                "status": "todo",
+                "priority": "Low",
+                "owner": {
+                    "role": "Program",
+                    "name": "Jules"
+                },
+                "laneId": "lane-release",
+                "start": "2026-02-11",
+                "end": "2026-02-20",
+                "percentComplete": 0,
+                "tags": [
+                    "release",
+                    "readout",
+                    "stakeholders"
+                ],
+                "dependencies": [
+                    "TSK-003",
+                    "TSK-005"
+                ],
+                "updatedAt": "2026-01-19"
+            }
+        ]
+    }
+}

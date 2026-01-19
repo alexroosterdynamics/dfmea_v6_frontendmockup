@@ -38,26 +38,39 @@ function NavItem({ icon: Icon, label, active, onClick, right }) {
   );
 }
 
+/**
+ * ✅ SubItem must NOT be a <button> if it contains another <button>.
+ * Otherwise you get: <button> cannot be a descendant of <button>.
+ *
+ * So this is a div with role="button" (keyboard accessible).
+ */
 function SubItem({ label, onClick, active, right }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
       className={cx(
         "group w-full px-2 py-1.5 rounded-md text-left",
         "text-[12px] tracking-tight",
         "hover:bg-zinc-200/40 transition-colors",
-        "flex items-center gap-2",
+        "flex items-center gap-2 select-none cursor-pointer",
         active ? "text-zinc-900 bg-zinc-200/40" : "text-zinc-700"
       )}
     >
       <span className="truncate flex-1">{label}</span>
       {right}
-    </button>
+    </div>
   );
 }
 
-export default function Sidebar({ tasksTitle, tasks = [] }) {
+export default function Sidebar({ tasksTitle, tasks = [], onOpenRequirementsManager }) {
   const {
     activeTab,
     setActiveTab,
@@ -70,6 +83,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
 
   // ✅ collapsed by default
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false); // ✅ NEW
 
   const rightChevron = useMemo(
     () => (
@@ -83,6 +97,20 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
       />
     ),
     [workflowsOpen]
+  );
+
+  const inboxChevron = useMemo(
+    () => (
+      <ChevronDown
+        size={16}
+        strokeWidth={1.8}
+        className={cx(
+          "text-zinc-500 transition-transform",
+          inboxOpen ? "rotate-0" : "-rotate-90"
+        )}
+      />
+    ),
+    [inboxOpen]
   );
 
   return (
@@ -133,12 +161,30 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
             active={activeTab === "ai"}
             onClick={() => setActiveTab("ai")}
           />
+
+          {/* ✅ Inbox group with manager view */}
           <NavItem
             icon={Inbox}
             label="Inbox"
-            active={activeTab === "inbox"}
-            onClick={() => setActiveTab("inbox")}
+            active={inboxOpen}
+            right={inboxChevron}
+            onClick={() => setInboxOpen((v) => !v)}
           />
+
+          {inboxOpen ? (
+            <div className="pl-6 mt-0.5 space-y-0.5">
+              <SubItem
+                label="Manager view"
+                active={activeTab === "requirementsManager"}
+                onClick={() => onOpenRequirementsManager?.()}
+                right={
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-200/70 bg-white text-zinc-500">
+                    Read-only
+                  </span>
+                }
+              />
+            </div>
+          ) : null}
 
           {/* ✅ Workflows: expand/collapse menu */}
           <NavItem
@@ -170,7 +216,9 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
                           e.stopPropagation();
 
                           const ok = window.confirm(
-                            `Delete workflow "${w.title?.trim() ? w.title : "Untitled workflow"}"?`
+                            `Delete workflow "${
+                              w.title?.trim() ? w.title : "Untitled workflow"
+                            }"?`
                           );
                           if (!ok) return;
 
