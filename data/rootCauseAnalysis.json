@@ -1,61 +1,96 @@
 {
-  "tabId": "rootCauseAnalysis",
-  "title": "Root Cause Analysis",
-  "meta": { "visibility": "Private", "edited": "Edited 2m ago" },
-  "tasksTitle": "Root cause analysis tasks",
-  "tasks": [
-    { "id": "c1", "label": "Select top risk item (highest RPN)", "done": true },
-    { "id": "c2", "label": "Draft 5-Whys chain", "done": false },
-    { "id": "c3", "label": "Identify contributing categories", "done": false },
-    { "id": "c4", "label": "Propose corrective / preventive actions", "done": false },
-    { "id": "c5", "label": "Update DFMEA controls + verification plan", "done": false }
+  "requirements": [
+    { "id": "REQ-001", "title": "System shall detect abnormal vibration within 200ms", "priority": "P1" },
+    { "id": "REQ-002", "title": "System shall keep false positives below 1 per day", "priority": "P1" }
   ],
-  "content": {
-    "focusItem": {
-      "failureMode": "Leakage above spec at end-of-line test",
-      "effect": "Performance degradation, customer returns",
-      "currentControls": ["EOL leak test", "Visual inspection of seal seating"]
+  "functions": [
+    { "id": "FUN-001", "requirementId": "REQ-001", "title": "Acquire accelerometer signal" },
+    { "id": "FUN-002", "requirementId": "REQ-001", "title": "Filter and normalize vibration data" },
+    { "id": "FUN-003", "requirementId": "REQ-002", "title": "Classify vibration events" }
+  ],
+  "failureModes": [
+    { "id": "FM-001", "functionId": "FUN-001", "title": "Sensor data not sampled at expected rate", "rpn": 168 },
+    { "id": "FM-002", "functionId": "FUN-002", "title": "Filter introduces excessive delay", "rpn": 192 },
+    { "id": "FM-003", "functionId": "FUN-003", "title": "Classifier flags normal patterns as abnormal", "rpn": 210 }
+  ],
+  "causes": [
+    {
+      "id": "C-001",
+      "failureModeId": "FM-001",
+      "title": "Timer interrupt jitter under load",
+      "occurrence": 6,
+      "detection": 4
     },
-    "categories": [
-      {
-        "name": "Man (People)",
-        "items": ["Inconsistent torque application", "Missed seal lubrication step"]
-      },
-      {
-        "name": "Machine (Equipment)",
-        "items": ["Worn torque tool clutch", "Test fixture seal damaged"]
-      },
-      {
-        "name": "Method (Process)",
-        "items": ["No poka-yoke for seal orientation", "Cleaning step skipped under time pressure"]
-      },
-      {
-        "name": "Material",
-        "items": ["Seal batch variation", "Surface finish out of spec on mating part"]
-      },
-      {
-        "name": "Measurement",
-        "items": ["Leak test calibration overdue", "Incorrect test pressure setting"]
-      },
-      {
-        "name": "Environment",
-        "items": ["Dust contamination", "Temperature affecting seal compression"]
-      }
-    ],
-    "fiveWhys": [
-      { "why": 1, "text": "Why is leakage above spec? → Seal not seated correctly." },
-      { "why": 2, "text": "Why not seated correctly? → Seal orientation occasionally reversed." },
-      { "why": 3, "text": "Why reversed? → No visual cue / poka-yoke in assembly step." },
-      { "why": 4, "text": "Why no poka-yoke? → Design did not include asymmetric feature." },
-      { "why": 5, "text": "Why not included? → Requirement for assembly error-proofing not captured." }
-    ]
-  },
-  "assistant": {
-    "welcome": "I can help generate a fishbone, expand 5-Whys, and translate outcomes into DFMEA actions + controls.",
-    "suggestedPrompts": [
-      "Turn the 5-Whys into DFMEA recommended actions.",
-      "Suggest detection and prevention controls for seal orientation.",
-      "What verification tests prove the corrective action worked?"
-    ]
-  }
+    {
+      "id": "C-002",
+      "failureModeId": "FM-002",
+      "title": "Filter window too large for latency target",
+      "occurrence": 5,
+      "detection": 6
+    },
+    {
+      "id": "C-003",
+      "failureModeId": "FM-003",
+      "title": "Training data missing certain normal operating modes",
+      "occurrence": 7,
+      "detection": 7
+    }
+  ],
+  "effects": [
+    {
+      "id": "E-001",
+      "failureModeId": "FM-001",
+      "title": "Missed abnormal vibration events",
+      "severity": 8
+    },
+    {
+      "id": "E-002",
+      "failureModeId": "FM-002",
+      "title": "Detection occurs too late to mitigate damage",
+      "severity": 9
+    },
+    {
+      "id": "E-003",
+      "failureModeId": "FM-003",
+      "title": "Nuisance alarms → operator ignores warnings",
+      "severity": 7
+    }
+  ],
+  "controls": [
+    {
+      "id": "CTRL-001",
+      "parentType": "cause",
+      "parentId": "C-001",
+      "title": "CPU load guardrails + ISR prioritization",
+      "controlType": "Prevention"
+    },
+    {
+      "id": "CTRL-002",
+      "parentType": "cause",
+      "parentId": "C-002",
+      "title": "Latency budget check in filter config",
+      "controlType": "Prevention"
+    },
+    {
+      "id": "CTRL-003",
+      "parentType": "cause",
+      "parentId": "C-003",
+      "title": "Dataset coverage tests + drift monitoring",
+      "controlType": "Detection"
+    },
+    {
+      "id": "CTRL-004",
+      "parentType": "effect",
+      "parentId": "E-002",
+      "title": "Emergency stop on sustained vibration threshold",
+      "controlType": "Mitigation"
+    },
+    {
+      "id": "CTRL-005",
+      "parentType": "effect",
+      "parentId": "E-003",
+      "title": "Alarm rate limiter + confidence threshold tuning",
+      "controlType": "Mitigation"
+    }
+  ]
 }

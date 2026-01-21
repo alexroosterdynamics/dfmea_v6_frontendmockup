@@ -76,10 +76,12 @@ export default function Workspace({
               {tabData.title}
             </div>
             <div className="text-[11px] text-zinc-500 whitespace-nowrap">
-              • {tabData.meta.visibility}
+              • {tabData?.meta?.visibility ?? "private"}
             </div>
           </div>
-          <div className="text-[11px] text-zinc-500 whitespace-nowrap">{tabData.meta.edited}</div>
+          <div className="text-[11px] text-zinc-500 whitespace-nowrap">
+            {tabData?.meta?.edited ?? "—"}
+          </div>
         </div>
 
         <div className="relative flex-1 overflow-hidden">

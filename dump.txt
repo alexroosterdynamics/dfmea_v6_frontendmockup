@@ -1,4 +1,4 @@
-PROJECT DUMP (2026-01-19T14:53:25)
+PROJECT DUMP (2026-01-21T09:53:52)
 ROOT: D:/dfmea_v6_frontendmockup/dfmea_v6_frontendmockup
 EXCLUDES: (none)
 
@@ -18,6 +18,7 @@ import requirementsJson from "../data/requirements.json";
 import processDiagram from "../data/processDiagram.json";
 import rootCauseAnalysis from "../data/rootCauseAnalysis.json";
 import workflowsJson from "../data/workflows.json";
+import tasksTimelineJson from "../data/tasks.json"; // ✅ NEW
 
 import { DFMEAProvider, useDFMEA } from "../contexts/Context";
 
@@ -36,6 +37,22 @@ function AppShell({ requirementsData, setRequirementsData }) {
   const tabDataMap = useMemo(
     () => ({
       requirements: requirementsData,
+
+      // ✅ manager view "sheet" (NOT in TopNav toggle)
+      requirementsManager: {
+        ...requirementsData,
+        tabId: "requirementsManager",
+        title: "Requirements • Manager View",
+        meta: {
+          ...(requirementsData?.meta || {}),
+          visibility: "Manager • read-only",
+          edited: "Frozen snapshot"
+        }
+      },
+
+      // ✅ new tasks timeline sheet (NOT in TopNav toggle)
+      tasksTimeline: tasksTimelineJson,
+
       processDiagram,
       rootCauseAnalysis,
       workflows: workflowsJson
@@ -104,7 +121,20 @@ function AppShell({ requirementsData, setRequirementsData }) {
         />
 
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar tasksTitle={tabData?.tasksTitle} tasks={tabData?.tasks} />
+          <Sidebar
+            tasksTitle={tabData?.tasksTitle}
+            tasks={tabData?.tasks}
+            onOpenRequirementsManager={() => {
+              // ✅ open manager view but keep TopNav highlighted on Requirements
+              setActiveTab("requirementsManager");
+              setActiveSheetTab("requirements");
+            }}
+            onOpenTasksTimeline={() => {
+              // ✅ open tasks timeline but keep TopNav highlighted where you were
+              setActiveTab("tasksTimeline");
+              // do NOT change activeSheetTab
+            }}
+          />
 
           <Workspace
             tabData={tabData}
@@ -134,46 +164,100 @@ export default function Page() {
 ==========================================================================================
 FILE: components/AiDock.js
 ==========================================================================================
-// components/AiDock.js
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Maximize2,
   Expand,
   Plus,
   ArrowUp,
-  Loader2
+  X,
+  PanelRightOpen,
+  PanelRightClose,
+  Sparkles
 } from "lucide-react";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
-/* ----------------------------- Shadows (different recipes) ----------------------------- */
+/* ----------------------------- Shadows ----------------------------- */
 const SH_DOCK =
   "shadow-[0_1px_0_rgba(0,0,0,0.06),0_30px_70px_rgba(0,0,0,0.16)]";
 
+/* ----------------------------- Snap thresholds ----------------------------- */
+const SNAP_RIGHT_EDGE_PX = 36; // near right edge = sidebar
+const SNAP_CORNER_PX = 120; // near bottom-right corner = orb
+const ORB_SIZE = 72;
+const FLOAT_W = 560; // floating width
+const BOTTOM_W = 860; // bottom dock width
+const SIDEBAR_W = 420; // right sidebar width
+
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
 export default function AiDock({ tabData }) {
+  /* ----------------------------- safe tabData ----------------------------- */
+  const safeTitle = tabData?.title ?? "Workspace";
+  const welcome =
+    tabData?.assistant?.welcome ??
+    "Hey — I’m your AI assistant. Ask me about requirements, risks, DFMEA, or the current sheet.";
+
+  const suggestedPrompts = tabData?.assistant?.suggestedPrompts ?? [];
+  const tabId = tabData?.tabId ?? "unknown";
+
+  /* ----------------------------- chat state ----------------------------- */
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+
   const [dockOpen, setDockOpen] = useState(false);
   const [dockSize, setDockSize] = useState("sm"); // sm | md | lg
   const [fullscreen, setFullscreen] = useState(false);
+
   const listRef = useRef(null);
 
+  /* -----------------------------
+    layout modes:
+    - bottom: your current default pinned bottom center
+    - floating: draggable free window
+    - sidebar: snapped right panel
+    - orb: tiny assistant circle
+  ----------------------------- */
+  const [mode, setMode] = useState("bottom");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // where floating / orb live
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  // drag system
+  const drag = useRef({
+    active: false,
+    pointerId: null,
+    offsetX: 0,
+    offsetY: 0,
+    preview: null, // "floating" | "sidebar" | "orb"
+    startMode: "bottom"
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewMode, setPreviewMode] = useState(null);
+
+  /* ----------------------------- init welcome per tab ----------------------------- */
   useEffect(() => {
     setInput("");
-    setMessages([{ role: "assistant", text: tabData.assistant.welcome }]);
-  }, [tabData.tabId, tabData.assistant.welcome]);
+    setMessages([{ role: "assistant", text: welcome }]);
+    // do not auto-open when switching tabs; only change welcome message
+  }, [tabId, welcome]);
 
+  /* ----------------------------- autoscroll chat ----------------------------- */
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, dockOpen, dockSize, fullscreen]);
+  }, [messages, dockOpen, dockSize, fullscreen, mode, sidebarOpen]);
 
+  /* ----------------------------- send mock message ----------------------------- */
   function send(text) {
-    const trimmed = text.trim();
+    const trimmed = String(text || "").trim();
     if (!trimmed) return;
 
     setMessages((m) => [
@@ -187,7 +271,12 @@ export default function AiDock({ tabData }) {
     ]);
 
     setInput("");
-    setDockOpen(true); // when you send, show the conversation
+    setDockOpen(true);
+    if (mode === "orb") {
+      // clicking orb should open normally -> become floating
+      snapToFloatingNearCorner();
+    }
+    if (mode === "sidebar") setSidebarOpen(true);
   }
 
   function cycleSize() {
@@ -198,11 +287,13 @@ export default function AiDock({ tabData }) {
   const heightClass =
     dockSize === "sm" ? "h-44" : dockSize === "lg" ? "h-[520px]" : "h-64";
 
+  /* ----------------------------- shell component ----------------------------- */
   const Shell = ({ children, className = "" }) => (
     <div
       className={cx(
-        "rounded-2xl border border-zinc-200/80 bg-white overflow-hidden",
+        "border border-zinc-200/80 bg-white overflow-hidden",
         SH_DOCK,
+        "transition-[border-radius,width,height,transform,opacity] duration-300 ease-out",
         className
       )}
     >
@@ -211,10 +302,10 @@ export default function AiDock({ tabData }) {
   );
 
   const PromptChips = () =>
-    tabData.assistant?.suggestedPrompts?.length ? (
+    suggestedPrompts.length ? (
       <div className="px-4 pb-3 bg-white">
         <div className="flex flex-wrap gap-2">
-          {tabData.assistant.suggestedPrompts.map((p) => (
+          {suggestedPrompts.map((p) => (
             <button
               key={p}
               onClick={() => send(p)}
@@ -248,7 +339,6 @@ export default function AiDock({ tabData }) {
     </div>
   );
 
-  // ChatGPT-like composer: centered, small, always usable
   const CompactComposer = ({ compact }) => (
     <div className={cx("bg-white", compact ? "p-3" : "p-3 border-t border-zinc-200/70")}>
       <div className="flex items-center gap-2 rounded-2xl border border-zinc-200/80 bg-white px-3 py-2">
@@ -288,14 +378,17 @@ export default function AiDock({ tabData }) {
       {compact ? (
         <div className="mt-2 flex items-center justify-between">
           <button
-            onClick={() => setDockOpen(true)}
+            onClick={() => {
+              setDockOpen(true);
+              if (mode === "orb") snapToFloatingNearCorner();
+              if (mode === "sidebar") setSidebarOpen(true);
+            }}
             className="text-[11px] text-zinc-600 hover:text-zinc-900 transition-colors"
           >
             Open chat
           </button>
-          <div className="text-[11px] text-zinc-500">
-            AI Assistant • {tabData.title}
-          </div>
+
+          <div className="text-[11px] text-zinc-500">AI Assistant • {safeTitle}</div>
         </div>
       ) : (
         <div className="mt-2 text-[11px] text-zinc-500">
@@ -305,18 +398,19 @@ export default function AiDock({ tabData }) {
     </div>
   );
 
+  /* ----------------------------- fullscreen overlay ----------------------------- */
   const Fullscreen = () => {
     if (!fullscreen) return null;
 
     return (
-      <div className="fixed inset-0 z-50">
+      <div className="fixed inset-0 z-[80]">
         <div
-          className="absolute inset-0 bg-zinc-950/20 backdrop-blur-sm"
+          className="absolute inset-0 bg-zinc-950/25 backdrop-blur-sm"
           onClick={() => setFullscreen(false)}
         />
         <div className="absolute inset-0 p-6 flex">
           <div className="m-auto w-full max-w-4xl h-[80vh]">
-            <Shell>
+            <Shell className="rounded-2xl h-full">
               <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-zinc-200/70">
                 <div>
                   <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
@@ -324,6 +418,7 @@ export default function AiDock({ tabData }) {
                   </div>
                   <div className="text-[11px] text-zinc-500">Full window • mock</div>
                 </div>
+
                 <button
                   onClick={() => setFullscreen(false)}
                   className="text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
@@ -353,6 +448,7 @@ export default function AiDock({ tabData }) {
                   ))}
                 </div>
               </div>
+
               <CompactComposer compact={false} />
             </Shell>
           </div>
@@ -361,88 +457,783 @@ export default function AiDock({ tabData }) {
     );
   };
 
+  /* -----------------------------
+    Drag logic:
+    - drag from header area near "AI Assistant"
+    - while dragging, compute preview snap:
+        * near right edge -> sidebar
+        * near bottom-right corner -> orb
+        * otherwise -> floating
+  ----------------------------- */
+
+  const canDragFrom = (el) => {
+    if (!el) return true;
+    // don't start drag from buttons/inputs
+    const tag = el.tagName?.toLowerCase?.();
+    if (tag === "button" || tag === "input" || tag === "textarea" || tag === "select") return false;
+    // also ignore icons inside buttons etc
+    if (el.closest?.("button, input, textarea, select")) return false;
+    return true;
+  };
+
+  function getViewport() {
+    if (typeof window === "undefined") return { w: 1200, h: 800 };
+    return { w: window.innerWidth, h: window.innerHeight };
+  }
+
+  function computePreview(clientX, clientY) {
+    const { w, h } = getViewport();
+
+    const nearRight = w - clientX <= SNAP_RIGHT_EDGE_PX;
+    const nearCorner = w - clientX <= SNAP_CORNER_PX && h - clientY <= SNAP_CORNER_PX;
+
+    if (nearCorner) return "orb";
+    if (nearRight) return "sidebar";
+    return "floating";
+  }
+
+  function snapToOrb() {
+    const { w, h } = getViewport();
+    const margin = 18;
+    setMode("orb");
+    setDockOpen(false);
+    setSidebarOpen(true);
+    setPos({
+      x: w - ORB_SIZE - margin,
+      y: h - ORB_SIZE - margin
+    });
+  }
+
+  function snapToSidebar() {
+    setMode("sidebar");
+    setSidebarOpen(true);
+    setDockOpen(true);
+  }
+
+  function snapToBottom() {
+    setMode("bottom");
+  }
+
+  function snapToFloatingNearCorner() {
+    const { w, h } = getViewport();
+    const margin = 18;
+    const panelW = FLOAT_W;
+    const panelH = dockOpen ? 420 : 150;
+    setMode("floating");
+    setPos({
+      x: w - panelW - margin,
+      y: h - panelH - margin - 60
+    });
+    setDockOpen(true);
+  }
+
+  function onPointerDownHeader(e) {
+    if (!canDragFrom(e.target)) return;
+
+    // Only allow drag if click is on the header "handle" area
+    // We'll allow drag from this top bar region (near AI Assistant label)
+    e.preventDefault();
+
+    const { w, h } = getViewport();
+
+    drag.current.active = true;
+    drag.current.pointerId = e.pointerId ?? null;
+    drag.current.startMode = mode;
+
+    setIsDragging(true);
+
+    // Convert current "mode" into a starting position if needed
+    // bottom/sidebar don't have pos -> start from cursor anchored
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    let baseX = pos.x;
+    let baseY = pos.y;
+
+    if (mode === "bottom") {
+      // start floating roughly from the bottom center
+      baseX = clamp((w - FLOAT_W) / 2, 12, w - FLOAT_W - 12);
+      baseY = clamp(h - 260, 12, h - 220);
+      setPos({ x: baseX, y: baseY });
+      setMode("floating");
+    }
+
+    if (mode === "sidebar") {
+      // pull out from sidebar to floating under cursor
+      baseX = clamp(w - FLOAT_W - 18, 12, w - FLOAT_W - 12);
+      baseY = clamp(140, 12, h - 220);
+      setPos({ x: baseX, y: baseY });
+      setMode("floating");
+    }
+
+    if (mode === "orb") {
+      // if somehow dragging from orb header (not typical), we treat as floating
+      baseX = clamp(w - FLOAT_W - 18, 12, w - FLOAT_W - 12);
+      baseY = clamp(h - 260, 12, h - 220);
+      setPos({ x: baseX, y: baseY });
+      setMode("floating");
+    }
+
+    drag.current.offsetX = startX - baseX;
+    drag.current.offsetY = startY - baseY;
+
+    setPreviewMode(null);
+
+    // capture pointer (more stable dragging)
+    try {
+      e.currentTarget?.setPointerCapture?.(e.pointerId);
+    } catch {}
+  }
+
+  function onPointerMoveWindow(e) {
+    if (!drag.current.active) return;
+
+    const { w, h } = getViewport();
+    const nextX = clamp(e.clientX - drag.current.offsetX, 10, w - FLOAT_W - 10);
+    const nextY = clamp(e.clientY - drag.current.offsetY, 10, h - 110);
+
+    setPos({ x: nextX, y: nextY });
+
+    const p = computePreview(e.clientX, e.clientY);
+    drag.current.preview = p;
+    setPreviewMode(p);
+  }
+
+  function onPointerUpWindow() {
+    if (!drag.current.active) return;
+
+    drag.current.active = false;
+    drag.current.pointerId = null;
+
+    setIsDragging(false);
+
+    // snap based on preview
+    const p = drag.current.preview;
+    setPreviewMode(null);
+    drag.current.preview = null;
+
+    if (p === "orb") {
+      snapToOrb();
+      return;
+    }
+    if (p === "sidebar") {
+      snapToSidebar();
+      return;
+    }
+
+    // otherwise keep floating at pos
+    setMode("floating");
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const move = (e) => onPointerMoveWindow(e);
+    const up = () => onPointerUpWindow();
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, dockOpen]);
+
+  /* ----------------------------- visuals based on mode ----------------------------- */
+  const frameStyle = useMemo(() => {
+    if (mode === "floating") {
+      return {
+        position: "fixed",
+        left: pos.x,
+        top: pos.y,
+        width: FLOAT_W,
+        zIndex: 60
+      };
+    }
+
+    if (mode === "orb") {
+      return {
+        position: "fixed",
+        left: pos.x,
+        top: pos.y,
+        width: ORB_SIZE,
+        height: ORB_SIZE,
+        zIndex: 65
+      };
+    }
+
+    if (mode === "sidebar") {
+      return {
+        position: "fixed",
+        right: 16,
+        top: 16,
+        bottom: 16,
+        width: SIDEBAR_W,
+        zIndex: 60
+      };
+    }
+
+    // bottom (default)
+    return {};
+  }, [mode, pos.x, pos.y]);
+
+  const frameClass = useMemo(() => {
+    if (mode === "bottom") return "max-w-[860px] mx-auto";
+    if (mode === "floating") {
+      const morph =
+        previewMode === "orb"
+          ? "scale-[0.95] opacity-90"
+          : previewMode === "sidebar"
+            ? "scale-[0.98] opacity-95"
+            : "opacity-100";
+      return cx(morph);
+    }
+    return "";
+  }, [mode, previewMode]);
+
+  /* ----------------------------- Orb UI ----------------------------- */
+  const Orb = () => {
+    if (mode !== "orb") return null;
+
+    return (
+      <div style={frameStyle}>
+        <button
+          onClick={() => {
+            // click orb -> open normally
+            snapToFloatingNearCorner();
+          }}
+          className={cx(
+            "w-full h-full rounded-full border border-zinc-200/70",
+            "bg-white/90 backdrop-blur",
+            "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
+            "hover:scale-[1.02] active:scale-[0.98] transition-transform",
+            "grid place-items-center relative overflow-hidden"
+          )}
+          title="AI Assistant"
+        >
+          {/* fun pulse ring */}
+          <div className="absolute inset-0">
+            <div className="absolute inset-[-40%] bg-[radial-gradient(circle,rgba(24,24,27,0.18),transparent_55%)] animate-[spin_9s_linear_infinite]" />
+          </div>
+
+          <div className="relative">
+            <div className="h-11 w-11 rounded-2xl bg-zinc-900 text-white grid place-items-center shadow-sm">
+              <Sparkles size={18} strokeWidth={2} />
+            </div>
+          </div>
+        </button>
+
+        {/* tiny hint */}
+        <div className="mt-2 text-center text-[10px] text-zinc-500 select-none">
+          AI
+        </div>
+      </div>
+    );
+  };
+
+  /* ----------------------------- Sidebar UI ----------------------------- */
+  const Sidebar = () => {
+    if (mode !== "sidebar") return null;
+
+    return (
+      <div style={frameStyle}>
+        <Shell className={cx("rounded-2xl h-full flex flex-col")}>
+          {/* HEADER (DRAG HANDLE) */}
+          <div
+            onPointerDown={onPointerDownHeader}
+            className={cx(
+              "px-4 py-3 flex items-center justify-between bg-white border-b border-zinc-200/70",
+              "cursor-grab active:cursor-grabbing select-none"
+            )}
+            title="Drag me"
+          >
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
+                AI Assistant
+              </div>
+              <div className="text-[11px] text-zinc-500 truncate">
+                Docked sidebar • {safeTitle}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSidebarOpen((v) => !v);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+                title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                {sidebarOpen ? (
+                  <>
+                    <PanelRightClose size={14} strokeWidth={1.7} />
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <PanelRightOpen size={14} strokeWidth={1.7} />
+                    Show
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  snapToOrb();
+                }}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                title="Turn into orb"
+              >
+                <Sparkles size={14} strokeWidth={1.7} />
+                Orb
+              </button>
+            </div>
+          </div>
+
+          {/* BODY */}
+          {sidebarOpen ? (
+            <>
+              <PromptChips />
+              <div className="flex-1 min-h-0">
+                <div
+                  ref={listRef}
+                  className="h-full overflow-y-auto px-4 py-4 space-y-3 bg-[#fbfbfa]"
+                >
+                  {messages.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className={cx(
+                        "max-w-[90%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed tracking-tight",
+                        m.role === "user"
+                          ? "ml-auto bg-zinc-900 text-white"
+                          : "bg-white border border-zinc-200/80 text-zinc-800"
+                      )}
+                    >
+                      {m.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <CompactComposer compact={false} />
+            </>
+          ) : (
+            <div className="p-3">
+              <Shell className="rounded-[22px]">
+                <CompactComposer compact />
+              </Shell>
+              <div className="mt-2 text-[11px] text-zinc-500">
+                Sidebar collapsed • click “Show”
+              </div>
+            </div>
+          )}
+        </Shell>
+      </div>
+    );
+  };
+
+  /* ----------------------------- Bottom/Floating dock UI ----------------------------- */
+  const DockPanel = () => {
+    // NOT in bottom/floating
+    if (mode !== "bottom" && mode !== "floating") return null;
+
+    const floating = mode === "floating";
+
+    // morph preview styles
+    const previewShape =
+      previewMode === "orb"
+        ? "rounded-full scale-[0.88] opacity-90"
+        : previewMode === "sidebar"
+          ? "rounded-2xl scale-[0.96] opacity-95"
+          : "rounded-2xl";
+
+    // When floating, you can “minimize into orb” or “dock right”
+    const TopActions = () => (
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDockOpen(false);
+          }}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+          title="Collapse"
+        >
+          <ChevronDown size={14} strokeWidth={1.7} />
+          Collapse
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            cycleSize();
+          }}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+          title="Resize"
+        >
+          <Expand size={14} strokeWidth={1.7} />
+          Size
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFullscreen(true);
+          }}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+          title="Full window"
+        >
+          <Maximize2 size={14} strokeWidth={1.7} />
+          Full
+        </button>
+      </div>
+    );
+
+    // HEADER WITH DRAG HANDLE
+    const Header = () => (
+      <div
+        onPointerDown={onPointerDownHeader}
+        className={cx(
+          "px-4 py-3 flex items-center justify-between bg-white border-b border-zinc-200/70",
+          "cursor-grab active:cursor-grabbing select-none"
+        )}
+        title="Drag me (snap right for sidebar, drag to corner for orb)"
+      >
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold tracking-tight text-zinc-900 flex items-center gap-2">
+            AI Assistant
+            {floating ? (
+              <span className="text-[10px] px-2 py-1 rounded-full border border-zinc-200/80 bg-[#fbfbfa] text-zinc-600">
+                floating
+              </span>
+            ) : (
+              <span className="text-[10px] px-2 py-1 rounded-full border border-zinc-200/80 bg-[#fbfbfa] text-zinc-600">
+                docked
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-zinc-500 truncate">
+            Context-aware chat (mock) • {safeTitle}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {floating ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  snapToSidebar();
+                }}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+                title="Dock to right sidebar"
+              >
+                <PanelRightOpen size={14} strokeWidth={1.7} />
+                Dock
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  snapToOrb();
+                }}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                title="Turn into orb"
+              >
+                <Sparkles size={14} strokeWidth={1.7} />
+                Orb
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  snapToBottom();
+                }}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+                title="Return to bottom dock"
+              >
+                <ChevronDown size={14} strokeWidth={1.7} className="rotate-180" />
+                Bottom
+              </button>
+            </>
+          ) : null}
+
+          <TopActions />
+        </div>
+      </div>
+    );
+
+    // collapsed header for bottom/floating
+    const CollapsedHeader = () => (
+      <div
+        onPointerDown={onPointerDownHeader}
+        className={cx(
+          "px-4 py-2 flex items-center justify-between bg-white",
+          "cursor-grab active:cursor-grabbing select-none"
+        )}
+        title="Drag me"
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDockOpen(true);
+          }}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
+          title="Expand"
+        >
+          <ChevronDown size={14} strokeWidth={1.7} className="rotate-180" />
+          Expand
+        </button>
+
+        <div className="text-[11px] text-zinc-500">AI Assistant</div>
+
+        <div className="flex items-center gap-1.5">
+          {floating ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                snapToOrb();
+              }}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+              title="Turn into orb"
+            >
+              <Sparkles size={14} strokeWidth={1.7} />
+              Orb
+            </button>
+          ) : null}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setFullscreen(true);
+            }}
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+            title="Full window"
+          >
+            <Maximize2 size={14} strokeWidth={1.7} />
+            Full
+          </button>
+        </div>
+      </div>
+    );
+
+    // wrapper container
+    const wrapperProps =
+      mode === "floating"
+        ? {
+            style: frameStyle,
+            className: frameClass
+          }
+        : {
+            className: cx("max-w-[860px] mx-auto", frameClass)
+          };
+
+    return (
+      <div {...wrapperProps}>
+        {/* if floating, allow “ghost morphing” while dragging */}
+        <div
+          className={cx(
+            "transition-transform duration-200 ease-out",
+            isDragging ? "scale-[1.01]" : "scale-100"
+          )}
+        >
+          {!dockOpen ? (
+            <Shell className={cx("rounded-[26px]", previewShape)}>
+              <CollapsedHeader />
+              <CompactComposer compact />
+            </Shell>
+          ) : (
+            <Shell className={cx("rounded-2xl", previewShape)}>
+              <Header />
+              <PromptChips />
+              <Messages />
+              <CompactComposer compact={false} />
+            </Shell>
+          )}
+        </div>
+
+        {/* subtle snap hint while dragging */}
+        {isDragging ? (
+          <div className="mt-2 text-center text-[11px] text-zinc-500 select-none">
+            {previewMode === "orb"
+              ? "Release → Orb (bottom-right)"
+              : previewMode === "sidebar"
+                ? "Release → Sidebar (right edge)"
+                : "Release → Floating"}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  /* ----------------------------- Render ----------------------------- */
   return (
     <>
       <Fullscreen />
 
-      {/* CENTERED dock width (ChatGPT-ish) */}
-      <div className="max-w-[860px] mx-auto">
-        {/* Collapsed state = compact composer only, still typeable */}
-        {!dockOpen ? (
-          <Shell className="rounded-[26px]">
-            <div className="px-4 py-2 flex items-center justify-between bg-white">
-              <button
-                onClick={() => setDockOpen(true)}
-                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
-                title="Expand"
-              >
-                <ChevronDown size={14} strokeWidth={1.7} className="rotate-180" />
-                Expand
-              </button>
+      {/* Orb state */}
+      <Orb />
 
-              <div className="text-[11px] text-zinc-500">AI Assistant</div>
+      {/* Sidebar snapped state */}
+      <Sidebar />
 
-              <button
-                onClick={() => setFullscreen(true)}
-                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                title="Full window"
-              >
-                <Maximize2 size={14} strokeWidth={1.7} />
-                Full
-              </button>
-            </div>
-
-            <CompactComposer compact />
-          </Shell>
-        ) : (
-          <Shell>
-            <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-zinc-200/70">
-              <div className="min-w-0">
-                <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
-                  AI Assistant
-                </div>
-                <div className="text-[11px] text-zinc-500 truncate">
-                  Context-aware chat (mock) • {tabData.title}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setDockOpen(false)}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
-                  title="Collapse"
-                >
-                  <ChevronDown size={14} strokeWidth={1.7} />
-                  Collapse
-                </button>
-
-                <button
-                  onClick={cycleSize}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200/70 border border-zinc-200/80 text-zinc-700 transition-colors"
-                  title="Resize"
-                >
-                  <Expand size={14} strokeWidth={1.7} />
-                  Size
-                </button>
-
-                <button
-                  onClick={() => setFullscreen(true)}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                  title="Full window"
-                >
-                  <Maximize2 size={14} strokeWidth={1.7} />
-                  Full
-                </button>
-              </div>
-            </div>
-
-            <PromptChips />
-            <Messages />
-            <CompactComposer compact={false} />
-          </Shell>
-        )}
-      </div>
+      {/* Bottom or floating panel */}
+      <DockPanel />
     </>
+  );
+}
+
+
+==========================================================================================
+FILE: components/page.js
+==========================================================================================
+// app/page.js
+"use client";
+
+import { useMemo, useState } from "react";
+import TopNav from "../components/TopNav";
+import Sidebar from "../components/Sidebar";
+import Workspace from "../components/Workspace";
+
+import requirementsJson from "../data/requirements.json";
+import processDiagram from "../data/processDiagram.json";
+import rootCauseAnalysis from "../data/rootCauseAnalysis.json";
+import workflowsJson from "../data/workflows.json";
+
+import { DFMEAProvider, useDFMEA } from "../contexts/Context";
+
+function AppShell({ requirementsData, setRequirementsData }) {
+  const tabs = useMemo(
+    () => [
+      { id: "requirements", label: "Requirements" },
+      { id: "processDiagram", label: "Process Diagram" },
+      { id: "rootCauseAnalysis", label: "Root Cause Analysis" }
+    ],
+    []
+  );
+
+  const { activeTab, setActiveTab } = useDFMEA();
+
+  const tabDataMap = useMemo(
+    () => ({
+      // ✅ normal requirements
+      requirements: requirementsData,
+
+      // ✅ manager view "sheet" (NOT in TopNav toggle)
+      requirementsManager: {
+        ...requirementsData,
+        tabId: "requirementsManager",
+        title: "Requirements • Manager View",
+        meta: {
+          ...(requirementsData?.meta || {}),
+          visibility: "Manager • read-only",
+          edited: "Frozen snapshot"
+        }
+      },
+
+      processDiagram,
+      rootCauseAnalysis,
+      workflows: workflowsJson
+    }),
+    [requirementsData]
+  );
+
+  const tabData = tabDataMap[activeTab] ?? tabDataMap.requirements;
+
+  const [activeSheetTab, setActiveSheetTab] = useState("requirements");
+
+  const requirementsUnlocked = useMemo(() => {
+    const reqs = requirementsData?.content?.requirements ?? [];
+    if (!reqs.length) return false;
+    const allComplete = reqs.every((r) => !!r.isComplete);
+    const noneFlagged = reqs.every((r) => !r.flagged);
+    return allComplete && noneFlagged;
+  }, [requirementsData]);
+
+  // local dev gating (unchanged)
+  const [devOverride, setDevOverride] = useState(false);
+  const [listViewUnlocked, setListViewUnlocked] = useState(false);
+
+  const canAccessOtherTabs = requirementsUnlocked || devOverride || listViewUnlocked;
+
+  function handleChangeTab(nextTabId) {
+    // ✅ Workflows always accessible and DOES NOT affect TopNav indicator
+    if (nextTabId === "workflows") {
+      setActiveTab("workflows");
+      return;
+    }
+
+    if (nextTabId !== "requirements" && !canAccessOtherTabs) return;
+
+    setActiveTab(nextTabId);
+    setActiveSheetTab(nextTabId);
+  }
+
+  function onUpdateRequirements(nextRequirementsArray) {
+    setRequirementsData((prev) => ({
+      ...prev,
+      content: {
+        ...prev.content,
+        requirements: nextRequirementsArray
+      }
+    }));
+  }
+
+  return (
+    <div className="h-screen bg-[#fbfbfa] text-zinc-900 antialiased">
+      <div className="lg:hidden h-screen flex items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <div className="text-xl font-semibold tracking-tight">Desktop required</div>
+          <div className="mt-2 text-sm text-zinc-600">
+            This mock UI is designed strictly for desktop layouts.
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden lg:flex h-full flex-col overflow-hidden">
+        <TopNav
+          tabs={tabs}
+          activeTab={activeSheetTab}
+          onChangeTab={handleChangeTab}
+          unlockSheets={canAccessOtherTabs}
+        />
+
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar
+            tasksTitle={tabData?.tasksTitle}
+            tasks={tabData?.tasks}
+            onOpenRequirementsManager={() => {
+              // ✅ open manager view but keep TopNav highlighted on Requirements
+              setActiveTab("requirementsManager");
+              setActiveSheetTab("requirements");
+            }}
+          />
+
+          <Workspace
+            tabData={tabData}
+            onUpdateRequirements={onUpdateRequirements}
+            requirementsUnlocked={requirementsUnlocked}
+            devOverride={devOverride}
+            onDevSetOverride={setDevOverride}
+            onListViewUnlock={() => setListViewUnlocked(true)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Page() {
+  const [requirementsData, setRequirementsData] = useState(requirementsJson);
+
+  return (
+    <DFMEAProvider initialWorkflows={workflowsJson?.content?.workflows ?? []}>
+      <AppShell requirementsData={requirementsData} setRequirementsData={setRequirementsData} />
+    </DFMEAProvider>
   );
 }
 
@@ -730,6 +1521,376 @@ export default function ProcessForceGraph({ className = "" }) {
         onNodeDragEnd={handleNodeDragEnd}
         onNodeHover={(node) => setHoveredNode(node)}
       />
+    </div>
+  );
+}
+
+
+==========================================================================================
+FILE: components/RequirementsManagerViewport.js
+==========================================================================================
+// components/RequirementsManagerViewport.js
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  Paperclip,
+  Cpu,
+  Zap,
+  Wrench,
+  ShieldCheck,
+  Search,
+  SlidersHorizontal,
+  Lock
+} from "lucide-react";
+
+const cx = (...c) => c.filter(Boolean).join(" ");
+
+const SH_SURFACE =
+  "shadow-[0_1px_0_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.06)]";
+const SH_TILE =
+  "shadow-[0_1px_0_rgba(0,0,0,0.05),0_10px_24px_rgba(0,0,0,0.06)]";
+
+const ICONS = { Software: Cpu, Electrical: Zap, Mechanical: Wrench };
+
+const frozen = (r) => !!r.isComplete && !r.flagged;
+
+function Surface({ className = "", children }) {
+  return (
+    <div className={cx("rounded-xl border border-zinc-200/80 bg-white", SH_SURFACE, className)}>
+      {children}
+    </div>
+  );
+}
+
+function Pill({ tone = "neutral", children, className = "" }) {
+  const cls =
+    tone === "good"
+      ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
+      : tone === "bad"
+        ? "bg-amber-50 border-amber-200/70 text-amber-900"
+        : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
+
+  return (
+    <span
+      className={cx(
+        "text-[11px] px-2 py-1 rounded-full border tracking-tight inline-flex items-center gap-1.5",
+        cls,
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PageTitle({ title, subtitle, rightSlot }) {
+  return (
+    <div className="max-w-6xl mx-auto px-10 pt-12 pb-5">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <div className="text-[40px] leading-[1.12] font-semibold tracking-tight">
+            {title}
+          </div>
+          {subtitle ? (
+            <div className="mt-2 text-[13px] text-zinc-600 tracking-tight">{subtitle}</div>
+          ) : null}
+        </div>
+        {rightSlot ? <div className="pt-2">{rightSlot}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function FrozenBadge() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2">
+      <div className="h-8 w-8 rounded-xl bg-white border border-zinc-200/80 grid place-items-center">
+        <ShieldCheck size={16} strokeWidth={1.8} className="text-zinc-800" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[12px] font-semibold tracking-tight text-zinc-900">
+          Manager View
+        </div>
+        <div className="text-[11px] text-zinc-500 tracking-tight">
+          Read-only • Frozen requirements only
+        </div>
+      </div>
+      <Pill tone="good" className="ml-2">
+        <Lock size={12} strokeWidth={2} />
+        Locked
+      </Pill>
+    </div>
+  );
+}
+
+export default function RequirementsManagerViewport({ data }) {
+  const projectName = data?.content?.projectName ?? "DFMEA Project";
+  const requirements = data?.content?.requirements ?? [];
+
+  const frozenReqs = useMemo(() => requirements.filter((r) => frozen(r)), [requirements]);
+
+  const stats = useMemo(() => {
+    const total = requirements.length;
+    const f = frozenReqs.length;
+    return { total, frozen: f, unfrozen: total - f };
+  }, [requirements.length, frozenReqs.length]);
+
+  // lightweight manager-only controls
+  const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("id"); // id | priority | updated
+
+  const buckets = useMemo(() => {
+    const map = { Software: [], Electrical: [], Mechanical: [] };
+
+    frozenReqs.forEach((r) => {
+      const d = r.domainCategory || "Software";
+      (map[d] ??= []).push(r);
+    });
+
+    const byPriority = (p) => {
+      const x = String(p || "").toLowerCase();
+      if (x.includes("high")) return 0;
+      if (x.includes("medium")) return 1;
+      if (x.includes("low")) return 2;
+      return 3;
+    };
+
+    const sorter = (a, b) => {
+      if (sortMode === "priority") {
+        const ap = byPriority(a.priority);
+        const bp = byPriority(b.priority);
+        if (ap !== bp) return ap - bp;
+        return String(a.id).localeCompare(String(b.id));
+      }
+
+      if (sortMode === "updated") {
+        // mostly mock strings; keep stable fallback
+        const au = String(a.lastUpdated || "");
+        const bu = String(b.lastUpdated || "");
+        if (au !== bu) return bu.localeCompare(au);
+        return String(a.id).localeCompare(String(b.id));
+      }
+
+      return String(a.id).localeCompare(String(b.id));
+    };
+
+    Object.keys(map).forEach((k) => {
+      map[k] = (map[k] || []).slice().sort(sorter);
+    });
+
+    // show most populated first
+    const order = Object.keys(map).sort((a, b) => (map[b]?.length || 0) - (map[a]?.length || 0));
+    return { map, order };
+  }, [frozenReqs, sortMode]);
+
+  const q = query.trim().toLowerCase();
+
+  const filtered = useMemo(() => {
+    if (!q) return buckets.map;
+
+    const out = {};
+    buckets.order.forEach((d) => {
+      const list = buckets.map[d] || [];
+      out[d] = list.filter((r) => {
+        const hay = `${r.id} ${r.text} ${r.reqType} ${r.ownerRole} ${r.ownerName} ${r.priority}`.toLowerCase();
+        return hay.includes(q);
+      });
+    });
+    return out;
+  }, [buckets.map, buckets.order, q]);
+
+  return (
+    <div className="pb-24">
+      <PageTitle
+        title="Requirements"
+        subtitle={
+          <>
+            Manager sheet • <span className="text-zinc-900 font-medium">{projectName}</span>
+          </>
+        }
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <FrozenBadge />
+
+            <Pill tone={stats.frozen ? "good" : "bad"}>
+              <CheckCircle2 size={12} strokeWidth={2} />
+              {stats.frozen}/{stats.total} frozen
+            </Pill>
+
+            <Pill>
+              <SlidersHorizontal size={12} strokeWidth={2} />
+              View-only
+            </Pill>
+          </div>
+        }
+      />
+
+      <div className="max-w-6xl mx-auto px-10">
+        <Surface className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="rounded-xl bg-[#fbfbfa] border border-zinc-200/80 px-3 py-2 flex items-center gap-2 min-w-[420px]">
+                <Search size={16} strokeWidth={1.7} className="text-zinc-600" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full text-[13px] tracking-tight outline-none placeholder:text-zinc-400 bg-transparent"
+                  placeholder="Search frozen requirements (ID, text, owner, type, priority)…"
+                />
+              </div>
+
+              <div className="text-[11px] text-zinc-500 tracking-tight">
+                Showing frozen only • {frozenReqs.length} items
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Sort</div>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value)}
+                className="text-[12px] px-3 py-2 rounded-xl bg-white border border-zinc-200/80 outline-none"
+              >
+                <option value="id">ID</option>
+                <option value="priority">Priority</option>
+                <option value="updated">Last updated</option>
+              </select>
+
+              <button
+                className="text-[12px] font-medium tracking-tight px-3 py-2 rounded-xl bg-white border border-zinc-200/80 text-zinc-300 cursor-not-allowed"
+                disabled
+                title="Mock action"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </Surface>
+
+        {/* groups */}
+        <div className="mt-5 space-y-5">
+          {buckets.order.map((domainKey) => {
+            const list = filtered[domainKey] || [];
+            if (!list.length) return null;
+
+            const Icon = ICONS[domainKey] || Wrench;
+
+            return (
+              <div key={domainKey} className={cx("rounded-xl border border-zinc-200/80 bg-white", SH_SURFACE)}>
+                <div className="px-4 py-3 border-b border-zinc-200/70 bg-[#fbfbfa] flex items-center justify-between">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl border border-zinc-200/80 bg-white grid place-items-center">
+                      <Icon size={16} strokeWidth={1.8} className="text-zinc-800" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-semibold tracking-tight text-zinc-900">
+                        {domainKey}
+                      </div>
+                      <div className="text-[11px] text-zinc-500 tracking-tight">
+                        {list.length} frozen requirements
+                      </div>
+                    </div>
+                  </div>
+
+                  <Pill tone="good">
+                    <CheckCircle2 size={12} strokeWidth={2} />
+                    Frozen
+                  </Pill>
+                </div>
+
+                {/* compact manager table */}
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-12 text-[11px] font-medium text-zinc-500 bg-white border-b border-zinc-200/70">
+                    <div className="col-span-2 px-5 py-3">ID</div>
+                    <div className="col-span-6 px-5 py-3">Requirement</div>
+                    <div className="col-span-2 px-5 py-3">Owner</div>
+                    <div className="col-span-1 px-5 py-3">Type</div>
+                    <div className="col-span-1 px-5 py-3 text-right">Files</div>
+                  </div>
+
+                  {list.map((r) => {
+                    const filesCount = Array.isArray(r.files) ? r.files.length : 0;
+
+                    return (
+                      <div
+                        key={r.id}
+                        className={cx(
+                          "grid grid-cols-12 text-[13px] border-b last:border-b-0 border-zinc-200/60",
+                          "bg-white hover:bg-[#fbfbfa] transition-colors"
+                        )}
+                      >
+                        <div className="col-span-2 px-5 py-3 text-zinc-600">
+                          <div className="flex items-center gap-2">
+                            <span>{r.id}</span>
+                            <CheckCircle2 size={14} strokeWidth={2} className="text-zinc-900" />
+                          </div>
+                          {r.priority ? (
+                            <div className="mt-1 text-[11px] text-zinc-500">{r.priority}</div>
+                          ) : null}
+                        </div>
+
+                        <div className="col-span-6 px-5 py-3">
+                          <div className="text-zinc-900 leading-snug font-medium">
+                            {r.text}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {r.reqType ? <Pill>{r.reqType}</Pill> : null}
+                            {r.lastUpdated ? <Pill>{r.lastUpdated}</Pill> : null}
+                            <Pill tone="good">
+                              <Lock size={12} strokeWidth={2} />
+                              Read-only
+                            </Pill>
+                          </div>
+                        </div>
+
+                        <div className="col-span-2 px-5 py-3 text-zinc-600">
+                          <div className="text-zinc-900">{r.ownerRole || "—"}</div>
+                          <div className="mt-0.5 text-[11px] text-zinc-500">
+                            {r.ownerName || "—"}
+                          </div>
+                        </div>
+
+                        <div className="col-span-1 px-5 py-3 text-zinc-600">
+                          <div className="text-zinc-900">{r.reqType ? "F" : "—"}</div>
+                          <div className="mt-0.5 text-[11px] text-zinc-500">Frozen</div>
+                        </div>
+
+                        <div className="col-span-1 px-5 py-3 text-right text-zinc-600">
+                          <span className="inline-flex items-center justify-end gap-2">
+                            <Paperclip size={14} strokeWidth={1.7} className="text-zinc-500" />
+                            {filesCount}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* subtle footer */}
+                <div className="px-5 py-3 bg-white">
+                  <div className="text-[11px] text-zinc-500 tracking-tight">
+                    This is a manager-only surface. Requirements are frozen and cannot be edited here.
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {!frozenReqs.length ? (
+            <Surface className="p-8">
+              <div className="text-[14px] font-semibold tracking-tight text-zinc-900">
+                No frozen requirements yet
+              </div>
+              <div className="mt-1 text-[13px] text-zinc-600 tracking-tight">
+                Complete requirements (Good + not flagged) to have them appear in this manager view.
+              </div>
+            </Surface>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2008,7 +3169,8 @@ import {
   Search,
   ChevronDown,
   GitBranch,
-  Plus
+  Plus,
+  ClipboardList
 } from "lucide-react";
 
 import { useDFMEA } from "@/contexts/Context";
@@ -2034,12 +3196,6 @@ function NavItem({ icon: Icon, label, active, onClick, right }) {
   );
 }
 
-/**
- * ✅ SubItem must NOT be a <button> if it contains another <button>.
- * Otherwise you get: <button> cannot be a descendant of <button>.
- *
- * So this is a div with role="button" (keyboard accessible).
- */
 function SubItem({ label, onClick, active, right }) {
   return (
     <div
@@ -2066,7 +3222,12 @@ function SubItem({ label, onClick, active, right }) {
   );
 }
 
-export default function Sidebar({ tasksTitle, tasks = [] }) {
+export default function Sidebar({
+  tasksTitle,
+  tasks = [],
+  onOpenRequirementsManager,
+  onOpenTasksTimeline // ✅ NEW
+}) {
   const {
     activeTab,
     setActiveTab,
@@ -2077,8 +3238,8 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
     deleteWorkflow
   } = useDFMEA();
 
-  // ✅ collapsed by default
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
 
   const rightChevron = useMemo(
     () => (
@@ -2094,6 +3255,17 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
     [workflowsOpen]
   );
 
+  const inboxChevron = useMemo(
+    () => (
+      <ChevronDown
+        size={16}
+        strokeWidth={1.8}
+        className={cx("text-zinc-500 transition-transform", inboxOpen ? "rotate-0" : "-rotate-90")}
+      />
+    ),
+    [inboxOpen]
+  );
+
   return (
     <aside className="w-[280px] h-full bg-[#f5f5f3] border-r border-zinc-200/70">
       <div className="h-full flex flex-col px-3 py-3">
@@ -2104,7 +3276,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
           </div>
           <div className="min-w-0 leading-tight">
             <div className="text-[13px] font-semibold tracking-tight text-zinc-900 truncate">
-              Engineering Space
+              Mechanical Engineer
             </div>
             <div className="text-[11px] text-zinc-500 truncate">Workspace • mock</div>
           </div>
@@ -2142,14 +3314,32 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
             active={activeTab === "ai"}
             onClick={() => setActiveTab("ai")}
           />
+
+          {/* Inbox group */}
           <NavItem
             icon={Inbox}
             label="Inbox"
-            active={activeTab === "inbox"}
-            onClick={() => setActiveTab("inbox")}
+            active={inboxOpen}
+            right={inboxChevron}
+            onClick={() => setInboxOpen((v) => !v)}
           />
 
-          {/* ✅ Workflows: expand/collapse menu */}
+          {inboxOpen ? (
+            <div className="pl-6 mt-0.5 space-y-0.5">
+              <SubItem
+                label="Manager view"
+                active={activeTab === "requirementsManager"}
+                onClick={() => onOpenRequirementsManager?.()}
+                right={
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-200/70 bg-white text-zinc-500">
+                    Read-only
+                  </span>
+                }
+              />
+            </div>
+          ) : null}
+
+          {/* Workflows */}
           <NavItem
             icon={GitBranch}
             label="Workflows"
@@ -2179,9 +3369,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
                           e.stopPropagation();
 
                           const ok = window.confirm(
-                            `Delete workflow "${
-                              w.title?.trim() ? w.title : "Untitled workflow"
-                            }"?`
+                            `Delete workflow "${w.title?.trim() ? w.title : "Untitled workflow"}"?`
                           );
                           if (!ok) return;
 
@@ -2199,9 +3387,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
                   />
                 ))
               ) : (
-                <div className="px-2 py-2 text-[12px] text-zinc-500">
-                  No workflows yet.
-                </div>
+                <div className="px-2 py-2 text-[12px] text-zinc-500">No workflows yet.</div>
               )}
 
               <button
@@ -2219,8 +3405,25 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
 
         {/* tasks */}
         <div className="mt-5 px-2">
-          <div className="text-[11px] font-medium text-zinc-500 tracking-tight">
-            {tasksTitle || "Tasks"}
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-medium text-zinc-500 tracking-tight">
+              {tasksTitle || "Tasks"}
+            </div>
+
+            {/* ✅ NEW: open detailed tasks sheet */}
+            <button
+              type="button"
+              onClick={() => onOpenTasksTimeline?.()}
+              className={cx(
+                "h-7 px-2 rounded-lg border border-zinc-200/80 bg-white",
+                "text-[11px] text-zinc-700 inline-flex items-center gap-1.5",
+                "hover:bg-zinc-100 transition-colors"
+              )}
+              title="Open detailed tasks view"
+            >
+              <ClipboardList size={14} strokeWidth={1.8} className="text-zinc-600" />
+              View
+            </button>
           </div>
 
           <div className="mt-2 space-y-1">
@@ -2245,9 +3448,7 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
             ))}
 
             {!tasks.length ? (
-              <div className="text-[12px] text-zinc-500 px-2 py-2">
-                No tasks in this tab.
-              </div>
+              <div className="text-[12px] text-zinc-500 px-2 py-2">No tasks in this tab.</div>
             ) : null}
           </div>
         </div>
@@ -2259,6 +3460,979 @@ export default function Sidebar({ tasksTitle, tasks = [] }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+
+==========================================================================================
+FILE: components/TasksTimelineViewport.js
+==========================================================================================
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Search,
+  Filter,
+  Flag,
+  Link2,
+  Sparkles,
+  X,
+  Save,
+  LayoutPanelLeft,
+  LayoutPanelTop,
+  LayoutGrid,
+  Maximize2
+} from "lucide-react";
+
+const cx = (...c) => c.filter(Boolean).join(" ");
+
+/* ----------------------------- Surface styling ----------------------------- */
+const SH_SURFACE =
+  "shadow-[0_1px_0_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.06)]";
+
+function Surface({ className = "", children }) {
+  return (
+    <div
+      className={cx("rounded-2xl border border-zinc-200/80 bg-white", SH_SURFACE, className)}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Pill({ tone = "neutral", children }) {
+  const cls =
+    tone === "good"
+      ? "bg-emerald-50 border-emerald-200/70 text-emerald-900"
+      : tone === "bad"
+        ? "bg-amber-50 border-amber-200/70 text-amber-900"
+        : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
+
+  return (
+    <span className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}>
+      {children}
+    </span>
+  );
+}
+
+function statusMeta(status) {
+  if (status === "done") return { label: "Done", tone: "good", icon: CheckCircle2 };
+  if (status === "blocked") return { label: "Blocked", tone: "bad", icon: AlertTriangle };
+  if (status === "in_progress") return { label: "In progress", tone: "neutral", icon: Clock };
+  return { label: "To do", tone: "neutral", icon: Clock };
+}
+
+function priorityRank(p) {
+  const x = String(p || "").toLowerCase();
+  if (x.includes("high")) return 0;
+  if (x.includes("medium")) return 1;
+  if (x.includes("low")) return 2;
+  return 3;
+}
+
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
+
+/* ----------------------------- Timeline helpers ----------------------------- */
+function toDate(d) {
+  const [y, m, day] = String(d).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, day || 1);
+}
+function diffDays(a, b) {
+  const ms = toDate(b).getTime() - toDate(a).getTime();
+  return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+/* ----------------------------- Modal ----------------------------- */
+function Modal({ open, title, subtitle, onClose, children, footer }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70]">
+      <div
+        className="absolute inset-0 bg-zinc-950/35 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="absolute inset-0 p-6 flex">
+        <div className="m-auto w-full max-w-3xl">
+          <Surface className="overflow-hidden">
+            <div className="px-5 py-4 bg-white border-b border-zinc-200/70 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-[14px] font-semibold tracking-tight text-zinc-900 truncate">
+                  {title}
+                </div>
+                {subtitle ? (
+                  <div className="mt-1 text-[12px] text-zinc-500 tracking-tight truncate">
+                    {subtitle}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                onClick={onClose}
+                className="h-9 w-9 rounded-xl grid place-items-center border border-zinc-200/80 bg-white hover:bg-zinc-100 transition-colors"
+                aria-label="Close"
+              >
+                <X size={16} strokeWidth={2} className="text-zinc-700" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5 bg-white">{children}</div>
+
+            {footer ? (
+              <div className="px-5 py-4 bg-[#fbfbfa] border-t border-zinc-200/70">
+                {footer}
+              </div>
+            ) : null}
+          </Surface>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Main Component ----------------------------- */
+export default function TasksTimelineViewport({ data }) {
+  // incoming data (from tasks.json sheet)
+  const projectName = data?.content?.projectName ?? "DFMEA Project";
+  const lanes = data?.content?.lanes ?? [];
+  const milestones = data?.content?.milestones ?? [];
+  const range = data?.content?.range ?? { start: "2026-01-01", end: "2026-02-01" };
+
+  // IMPORTANT: we keep tasks in local state so edits can show instantly in mock UI
+  const [tasks, setTasks] = useState(() => data?.content?.tasks ?? []);
+
+  // view modes (Monday/Salesforce-ish switching)
+  // timeline: timeline huge, tasks compact
+  // split: balanced
+  // tasks: tasks big
+  // timelineOnly: full width timeline
+  const [viewMode, setViewMode] = useState("timeline"); // timeline | split | tasks | timelineOnly
+
+  // filters
+  const [query, setQuery] = useState("");
+  const [laneFilter, setLaneFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("priority"); // priority | start | owner
+
+  // modal editing
+  const [editId, setEditId] = useState(null);
+
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.status === "done").length;
+    const blocked = tasks.filter((t) => t.status === "blocked").length;
+    const ip = tasks.filter((t) => t.status === "in_progress").length;
+    const todo = tasks.filter((t) => t.status === "todo").length;
+    return { total, done, blocked, ip, todo };
+  }, [tasks]);
+
+  const q = query.trim().toLowerCase();
+
+  const filtered = useMemo(() => {
+    let list = tasks.slice();
+
+    if (laneFilter !== "all") list = list.filter((t) => t.laneId === laneFilter);
+    if (statusFilter !== "all") list = list.filter((t) => t.status === statusFilter);
+
+    if (q) {
+      list = list.filter((t) => {
+        const hay = `${t.id} ${t.title} ${t.description} ${t.priority} ${t.owner?.role} ${t.owner?.name} ${t.tags?.join(
+          " "
+        )}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    if (sortMode === "priority") {
+      list.sort((a, b) => {
+        const ap = priorityRank(a.priority);
+        const bp = priorityRank(b.priority);
+        if (ap !== bp) return ap - bp;
+        return String(a.id).localeCompare(String(b.id));
+      });
+    } else if (sortMode === "start") {
+      list.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    } else {
+      list.sort((a, b) => String(a.owner?.name || "").localeCompare(String(b.owner?.name || "")));
+    }
+
+    return list;
+  }, [tasks, laneFilter, statusFilter, sortMode, q]);
+
+  // lane grouping for timeline rows
+  const byLane = useMemo(() => {
+    const map = {};
+    lanes.forEach((l) => (map[l.id] = []));
+    filtered.forEach((t) => {
+      (map[t.laneId] ??= []).push(t);
+    });
+    return map;
+  }, [filtered, lanes]);
+
+  const editTask = useMemo(() => tasks.find((t) => t.id === editId) || null, [tasks, editId]);
+
+  // timeline sizing
+  const totalDays = Math.max(1, diffDays(range.start, range.end));
+  const pxPerDay = 16; // bigger for readability
+  const timelineWidth = totalDays * pxPerDay;
+
+  // split sizing based on viewMode
+  const split = useMemo(() => {
+    if (viewMode === "timeline") return { left: 32, right: 68 };
+    if (viewMode === "split") return { left: 42, right: 58 };
+    if (viewMode === "tasks") return { left: 60, right: 40 };
+    return { left: 0, right: 100 }; // timelineOnly
+  }, [viewMode]);
+
+  function openEditor(taskId) {
+    setEditId(taskId);
+  }
+
+  function closeEditor() {
+    setEditId(null);
+  }
+
+  function updateTask(patch) {
+    if (!editTask) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === editTask.id
+          ? {
+              ...t,
+              ...patch,
+              updatedAt: "2026-01-19" // mock “just now”
+            }
+          : t
+      )
+    );
+  }
+
+  // editor form local draft (so we can cancel)
+  const [draft, setDraft] = useState(null);
+
+  // whenever editTask changes, prepare draft
+  useMemo(() => {
+    if (!editTask) {
+      setDraft(null);
+      return null;
+    }
+    setDraft({
+      id: editTask.id,
+      title: editTask.title || "",
+      description: editTask.description || "",
+      status: editTask.status || "todo",
+      priority: editTask.priority || "",
+      laneId: editTask.laneId || "",
+      ownerRole: editTask.owner?.role || "",
+      ownerName: editTask.owner?.name || "",
+      start: editTask.start || range.start,
+      end: editTask.end || range.end,
+      percentComplete: Number(editTask.percentComplete || 0),
+      tags: (editTask.tags || []).join(", "),
+      dependencies: (editTask.dependencies || []).join(", ")
+    });
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
+
+  function saveDraft() {
+    if (!draft) return;
+
+    updateTask({
+      title: draft.title,
+      description: draft.description,
+      status: draft.status,
+      priority: draft.priority,
+      laneId: draft.laneId,
+      start: draft.start,
+      end: draft.end,
+      percentComplete: clamp(Number(draft.percentComplete || 0), 0, 100),
+      owner: {
+        role: draft.ownerRole,
+        name: draft.ownerName
+      },
+      tags: draft.tags
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+      dependencies: draft.dependencies
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+    });
+
+    closeEditor();
+  }
+
+  /* ----------------------------- Header ----------------------------- */
+  return (
+    <div className="h-full">
+      {/* page header (FULL WIDTH, no max-w clamp) */}
+      <div className="px-10 pt-10 pb-5">
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
+            <div className="text-[40px] leading-[1.12] font-semibold tracking-tight">
+              Tasks
+            </div>
+            <div className="mt-2 text-[13px] text-zinc-600 tracking-tight">
+              Planning sheet •{" "}
+              <span className="text-zinc-900 font-medium">{projectName}</span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2 flex-wrap justify-end">
+            <Pill tone="good">
+              <CheckCircle2 size={12} strokeWidth={2} className="inline" /> {stats.done} done
+            </Pill>
+            <Pill tone={stats.blocked ? "bad" : "neutral"}>
+              <AlertTriangle size={12} strokeWidth={2} className="inline" /> {stats.blocked} blocked
+            </Pill>
+            <Pill>
+              <Clock size={12} strokeWidth={2} className="inline" /> {stats.ip} active
+            </Pill>
+            <Pill>
+              <CalendarDays size={12} strokeWidth={2} className="inline" /> {range.start} →{" "}
+              {range.end}
+            </Pill>
+          </div>
+        </div>
+      </div>
+
+      {/* controls */}
+      <div className="px-10">
+        <Surface className="p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {/* search */}
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <div className="rounded-2xl bg-[#fbfbfa] border border-zinc-200/80 px-3 py-2 flex items-center gap-2 min-w-[420px]">
+                <Search size={16} strokeWidth={1.7} className="text-zinc-600" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full text-[13px] tracking-tight outline-none placeholder:text-zinc-400 bg-transparent"
+                  placeholder="Search tasks (ID, title, owner, tags)…"
+                />
+              </div>
+
+              <div className="text-[11px] text-zinc-500 tracking-tight">
+                Showing <span className="text-zinc-900 font-medium">{filtered.length}</span> of{" "}
+                <span className="text-zinc-900 font-medium">{tasks.length}</span>
+              </div>
+
+              <Pill>
+                <Sparkles size={12} strokeWidth={2} className="inline" /> AI-ready
+              </Pill>
+            </div>
+
+            {/* filters + view mode */}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <div className="text-[11px] text-zinc-500 tracking-tight inline-flex items-center gap-1">
+                <Filter size={12} strokeWidth={2} /> Filters
+              </div>
+
+              <select
+                value={laneFilter}
+                onChange={(e) => setLaneFilter(e.target.value)}
+                className="text-[12px] px-3 py-2 rounded-2xl bg-white border border-zinc-200/80 outline-none"
+              >
+                <option value="all">All lanes</option>
+                {lanes.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.title}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-[12px] px-3 py-2 rounded-2xl bg-white border border-zinc-200/80 outline-none"
+              >
+                <option value="all">All status</option>
+                <option value="todo">To do</option>
+                <option value="in_progress">In progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="done">Done</option>
+              </select>
+
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value)}
+                className="text-[12px] px-3 py-2 rounded-2xl bg-white border border-zinc-200/80 outline-none"
+              >
+                <option value="priority">Sort: priority</option>
+                <option value="start">Sort: start date</option>
+                <option value="owner">Sort: owner</option>
+              </select>
+
+              {/* view mode toggles */}
+              <div className="ml-1 flex items-center gap-1.5 rounded-2xl border border-zinc-200/80 bg-white p-1">
+                <button
+                  onClick={() => setViewMode("timeline")}
+                  className={cx(
+                    "px-2.5 py-1.5 rounded-xl text-[11px] tracking-tight inline-flex items-center gap-1.5",
+                    viewMode === "timeline"
+                      ? "bg-zinc-900 text-white"
+                      : "hover:bg-zinc-100 text-zinc-700"
+                  )}
+                  title="Timeline focus"
+                >
+                  <LayoutPanelTop size={14} strokeWidth={2} />
+                  Timeline
+                </button>
+
+                <button
+                  onClick={() => setViewMode("split")}
+                  className={cx(
+                    "px-2.5 py-1.5 rounded-xl text-[11px] tracking-tight inline-flex items-center gap-1.5",
+                    viewMode === "split"
+                      ? "bg-zinc-900 text-white"
+                      : "hover:bg-zinc-100 text-zinc-700"
+                  )}
+                  title="Balanced split"
+                >
+                  <LayoutGrid size={14} strokeWidth={2} />
+                  Split
+                </button>
+
+                <button
+                  onClick={() => setViewMode("tasks")}
+                  className={cx(
+                    "px-2.5 py-1.5 rounded-xl text-[11px] tracking-tight inline-flex items-center gap-1.5",
+                    viewMode === "tasks"
+                      ? "bg-zinc-900 text-white"
+                      : "hover:bg-zinc-100 text-zinc-700"
+                  )}
+                  title="Tasks focus"
+                >
+                  <LayoutPanelLeft size={14} strokeWidth={2} />
+                  Tasks
+                </button>
+
+                <button
+                  onClick={() => setViewMode("timelineOnly")}
+                  className={cx(
+                    "px-2.5 py-1.5 rounded-xl text-[11px] tracking-tight inline-flex items-center gap-1.5",
+                    viewMode === "timelineOnly"
+                      ? "bg-zinc-900 text-white"
+                      : "hover:bg-zinc-100 text-zinc-700"
+                  )}
+                  title="Timeline only"
+                >
+                  <Maximize2 size={14} strokeWidth={2} />
+                  Full
+                </button>
+              </div>
+            </div>
+          </div>
+        </Surface>
+      </div>
+
+      {/* Main layout (FULL WIDTH) */}
+      <div className="px-10 pb-24 mt-5">
+        <div className="flex gap-5 items-stretch">
+          {/* Left: tasks panel (can disappear) */}
+          {viewMode !== "timelineOnly" && split.left > 0 ? (
+            <div
+              className="min-w-[320px]"
+              style={{
+                width: `${split.left}%`
+              }}
+            >
+              <Surface className="h-[calc(100vh-320px)] flex flex-col overflow-hidden">
+                <div className="px-4 py-3 border-b border-zinc-200/70 bg-[#fbfbfa] flex items-center justify-between">
+                  <div>
+                    <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
+                      Task list
+                    </div>
+                    <div className="text-[11px] text-zinc-500 tracking-tight">
+                      Click a task to edit • shorter list • built for scanning
+                    </div>
+                  </div>
+
+                  <Pill>
+                    <Flag size={12} strokeWidth={2} className="inline" /> {filtered.length} shown
+                  </Pill>
+                </div>
+
+                {/* table-like list */}
+                <div className="flex-1 overflow-y-auto">
+                  {filtered.map((t) => {
+                    const meta = statusMeta(t.status);
+                    const Icon = meta.icon;
+
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => openEditor(t.id)}
+                        className={cx(
+                          "w-full text-left px-4 py-3 border-b last:border-b-0 border-zinc-200/60",
+                          "hover:bg-[#fbfbfa] transition-colors"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="text-[11px] text-zinc-500 tracking-tight">
+                                {t.id}
+                              </div>
+
+                              <Pill tone={meta.tone}>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Icon size={12} strokeWidth={2} />
+                                  {meta.label}
+                                </span>
+                              </Pill>
+
+                              {t.priority ? <Pill>{t.priority}</Pill> : null}
+                              <Pill>{t.start} → {t.end}</Pill>
+                            </div>
+
+                            <div className="mt-1 text-[13px] font-semibold tracking-tight text-zinc-900 truncate">
+                              {t.title}
+                            </div>
+
+                            <div className="mt-2 text-[11px] text-zinc-500 tracking-tight truncate">
+                              {t.owner?.role || "—"} • {t.owner?.name || "—"} • Updated {t.updatedAt}
+                            </div>
+
+                            {/* progress */}
+                            <div className="mt-2">
+                              <div className="h-2 rounded-full bg-zinc-200/80 overflow-hidden">
+                                <div
+                                  className="h-full bg-zinc-900 rounded-full"
+                                  style={{
+                                    width: `${clamp(Number(t.percentComplete || 0), 0, 100)}%`
+                                  }}
+                                />
+                              </div>
+                              <div className="mt-1 text-[11px] text-zinc-500 tracking-tight">
+                                {t.percentComplete ?? 0}% complete
+                              </div>
+                            </div>
+
+                            {/* tags */}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {(t.tags || []).slice(0, 3).map((tag) => (
+                                <Pill key={tag}>{tag}</Pill>
+                              ))}
+                              {(t.tags || []).length > 3 ? (
+                                <Pill>+{t.tags.length - 3} more</Pill>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  {!filtered.length ? (
+                    <div className="px-4 py-6 text-[12px] text-zinc-500">
+                      No tasks match your filters.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="px-4 py-3 border-t border-zinc-200/70 bg-white">
+                  <div className="text-[11px] text-zinc-500 tracking-tight">
+                    Tip: This list stays intentionally compact — timeline is the primary planning view.
+                  </div>
+                </div>
+              </Surface>
+            </div>
+          ) : null}
+
+          {/* Right: timeline (dominant) */}
+          <div style={{ width: `${split.right}%` }} className="min-w-0 flex-1">
+            <Surface className="h-[calc(100vh-320px)] flex flex-col overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-200/70 bg-[#fbfbfa] flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold tracking-tight text-zinc-900">
+                    Timeline
+                  </div>
+                  <div className="text-[11px] text-zinc-500 tracking-tight truncate">
+                    Monday/Salesforce-style planning • click bars to edit task
+                  </div>
+                </div>
+
+                <Pill>
+                  {totalDays} days • {pxPerDay}px/day
+                </Pill>
+              </div>
+
+              <div className="flex-1 relative overflow-hidden bg-white">
+                <div className="absolute inset-0 overflow-x-auto">
+                  {/* wider canvas */}
+                  <div className="relative" style={{ width: timelineWidth + 260 }}>
+                    {/* sticky header */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-zinc-200/70">
+                      <div className="flex">
+                        <div className="w-[260px] px-4 py-2 text-[11px] font-medium text-zinc-500">
+                          Lane
+                        </div>
+
+                        <div className="flex-1 px-2 py-2 text-[11px] font-medium text-zinc-500">
+                          {range.start} → {range.end}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* grid lines */}
+                    <div
+                      className="absolute left-[260px] top-[38px] bottom-0"
+                      style={{ width: timelineWidth }}
+                    >
+                      {Array.from({ length: totalDays + 1 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={cx(
+                            "absolute top-0 bottom-0",
+                            i % 7 === 0 ? "bg-zinc-200/60" : "bg-zinc-100/60"
+                          )}
+                          style={{
+                            left: i * pxPerDay,
+                            width: 1
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* milestones */}
+                    <div
+                      className="absolute left-[260px] top-[38px] bottom-0 pointer-events-none"
+                      style={{ width: timelineWidth }}
+                    >
+                      {milestones.map((m) => {
+                        const x = diffDays(range.start, m.date) * pxPerDay;
+                        const tone =
+                          m.tone === "good"
+                            ? "bg-emerald-600"
+                            : m.tone === "bad"
+                              ? "bg-amber-600"
+                              : "bg-zinc-500";
+                        return (
+                          <div key={m.id} className="absolute top-0 bottom-0" style={{ left: x }}>
+                            <div className="w-[2px] h-full bg-zinc-900/25" />
+                            <div
+                              className={cx(
+                                "absolute top-2 -translate-x-1/2 px-2 py-1 rounded-xl text-[10px] text-white whitespace-nowrap",
+                                tone
+                              )}
+                            >
+                              {m.title}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* lanes */}
+                    <div className="divide-y divide-zinc-200/60">
+                      {lanes.map((lane) => {
+                        const laneTasks = byLane[lane.id] || [];
+
+                        return (
+                          <div key={lane.id} className="flex items-stretch">
+                            {/* lane label */}
+                            <div className="w-[260px] px-4 py-3 bg-[#fbfbfa]">
+                              <div className="text-[12px] font-semibold tracking-tight text-zinc-900">
+                                {lane.title}
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-zinc-500 tracking-tight">
+                                {lane.ownerGroup} • {laneTasks.length} tasks
+                              </div>
+                            </div>
+
+                            {/* lane timeline area */}
+                            <div className="relative flex-1 py-3" style={{ width: timelineWidth }}>
+                              <div className="relative h-[96px]">
+                                {laneTasks.map((t, idx) => {
+                                  const startX = diffDays(range.start, t.start) * pxPerDay;
+                                  const endX = diffDays(range.start, t.end) * pxPerDay;
+                                  const w = Math.max(10, endX - startX);
+
+                                  const meta = statusMeta(t.status);
+                                  const barTone =
+                                    meta.tone === "good"
+                                      ? "bg-emerald-500/85"
+                                      : meta.tone === "bad"
+                                        ? "bg-amber-500/85"
+                                        : "bg-zinc-900/75";
+
+                                  // stack within lane
+                                  const y = (idx % 4) * 22;
+
+                                  return (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => openEditor(t.id)}
+                                      className={cx(
+                                        "absolute rounded-xl border border-zinc-200/60",
+                                        "hover:opacity-95 transition-opacity",
+                                        "text-left focus:outline-none focus:ring-2 focus:ring-zinc-900/20"
+                                      )}
+                                      style={{
+                                        left: startX,
+                                        top: y,
+                                        width: w,
+                                        height: 18
+                                      }}
+                                      title={`${t.id} • ${t.title}`}
+                                    >
+                                      <div className={cx("h-full rounded-xl", barTone)} />
+
+                                      {/* progress overlay */}
+                                      <div
+                                        className="absolute inset-0 rounded-xl bg-white/25"
+                                        style={{
+                                          clipPath: `inset(0 ${
+                                            100 - clamp(Number(t.percentComplete || 0), 0, 100)
+                                          }% 0 0)`
+                                        }}
+                                      />
+
+                                      {/* label if wide enough */}
+                                      {w > 140 ? (
+                                        <div className="absolute inset-0 px-2 flex items-center">
+                                          <div className="text-[10px] text-white/95 font-medium truncate">
+                                            {t.id} • {t.title}
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </button>
+                                  );
+                                })}
+
+                                {!laneTasks.length ? (
+                                  <div className="px-3 text-[12px] text-zinc-400">
+                                    No tasks in this lane.
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="px-4 py-3 text-[11px] text-zinc-500 bg-white border-t border-zinc-200/70">
+                      Click a bar to open task editor • Milestones are vertical markers • Mock UI
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Surface>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit modal */}
+      <Modal
+        open={!!editTask}
+        title={draft?.title?.trim() ? draft.title : "Edit task"}
+        subtitle={editTask ? `${editTask.id} • ${editTask.laneId}` : ""}
+        onClose={closeEditor}
+        footer={
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] text-zinc-500">
+              This is a mock editor. Hook `setTasks(...)` into your real persistence later.
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={closeEditor}
+                className="px-3 py-2 rounded-2xl text-[12px] border border-zinc-200/80 bg-white hover:bg-zinc-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveDraft}
+                className="px-3 py-2 rounded-2xl text-[12px] bg-zinc-900 text-white hover:bg-zinc-800 transition-colors inline-flex items-center gap-2"
+              >
+                <Save size={14} strokeWidth={2} />
+                Save changes
+              </button>
+            </div>
+          </div>
+        }
+      >
+        {!draft ? null : (
+          <div className="grid grid-cols-12 gap-4">
+            {/* title */}
+            <div className="col-span-12">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Title</div>
+              <input
+                value={draft.title}
+                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+              />
+            </div>
+
+            {/* description */}
+            <div className="col-span-12">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Description</div>
+              <textarea
+                value={draft.description}
+                onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                rows={4}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px] resize-none"
+              />
+            </div>
+
+            {/* status */}
+            <div className="col-span-4">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Status</div>
+              <select
+                value={draft.status}
+                onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px] bg-white"
+              >
+                <option value="todo">To do</option>
+                <option value="in_progress">In progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+
+            {/* priority */}
+            <div className="col-span-4">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Priority</div>
+              <select
+                value={draft.priority}
+                onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px] bg-white"
+              >
+                <option value="">—</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            {/* lane */}
+            <div className="col-span-4">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Lane</div>
+              <select
+                value={draft.laneId}
+                onChange={(e) => setDraft((d) => ({ ...d, laneId: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px] bg-white"
+              >
+                {lanes.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* owner */}
+            <div className="col-span-6">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Owner role</div>
+              <input
+                value={draft.ownerRole}
+                onChange={(e) => setDraft((d) => ({ ...d, ownerRole: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+              />
+            </div>
+            <div className="col-span-6">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Owner name</div>
+              <input
+                value={draft.ownerName}
+                onChange={(e) => setDraft((d) => ({ ...d, ownerName: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+              />
+            </div>
+
+            {/* dates */}
+            <div className="col-span-6">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Start</div>
+              <input
+                value={draft.start}
+                onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+            <div className="col-span-6">
+              <div className="text-[11px] text-zinc-500 tracking-tight">End</div>
+              <input
+                value={draft.end}
+                onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+
+            {/* progress */}
+            <div className="col-span-12">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-zinc-500 tracking-tight">% complete</div>
+                <div className="text-[11px] text-zinc-500 tracking-tight">
+                  {clamp(Number(draft.percentComplete || 0), 0, 100)}%
+                </div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={clamp(Number(draft.percentComplete || 0), 0, 100)}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, percentComplete: Number(e.target.value) }))
+                }
+                className="mt-2 w-full"
+              />
+            </div>
+
+            {/* tags */}
+            <div className="col-span-12">
+              <div className="text-[11px] text-zinc-500 tracking-tight">Tags (comma separated)</div>
+              <input
+                value={draft.tags}
+                onChange={(e) => setDraft((d) => ({ ...d, tags: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+                placeholder="traceability, numeric targets, power"
+              />
+            </div>
+
+            {/* deps */}
+            <div className="col-span-12">
+              <div className="text-[11px] text-zinc-500 tracking-tight">
+                Dependencies (comma separated task IDs)
+              </div>
+              <input
+                value={draft.dependencies}
+                onChange={(e) => setDraft((d) => ({ ...d, dependencies: e.target.value }))}
+                className="mt-1 w-full px-3 py-2 rounded-2xl border border-zinc-200/80 outline-none text-[13px]"
+                placeholder="TSK-001, TSK-002"
+              />
+
+              {/* small dependency chips preview */}
+              <div className="mt-2 flex flex-wrap gap-2">
+                {draft.dependencies
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean)
+                  .slice(0, 8)
+                  .map((d) => (
+                    <span
+                      key={d}
+                      className="text-[11px] px-2 py-1 rounded-full border border-zinc-200/80 bg-[#fbfbfa] text-zinc-700 inline-flex items-center gap-1.5"
+                    >
+                      <Link2 size={12} strokeWidth={2} />
+                      {d}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
   );
 }
 
@@ -2284,7 +4458,9 @@ function Pill({ tone = "neutral", children }) {
       : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
 
   return (
-    <span className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}>
+    <span
+      className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}
+    >
       {children}
     </span>
   );
@@ -2331,6 +4507,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
   } = useDFMEA();
 
   const [toastOpen, setToastOpen] = useState(false);
+
+  // ✅ NEW: prevents automatic popup on initial load
+  const [hasOpenedNotices, setHasOpenedNotices] = useState(false);
 
   const activeLabel = useMemo(
     () => tabs.find((t) => t.id === activeTab)?.label ?? "",
@@ -2501,6 +4680,7 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
           <button
             onClick={() => {
               setToastOpen((v) => !v);
+              setHasOpenedNotices(true); // ✅ user has interacted
               markAllRead();
             }}
             className={cx(
@@ -2519,8 +4699,8 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
             ) : null}
           </button>
 
-          {/* Active notice card */}
-          {activeNotice && !toastOpen ? (
+          {/* ✅ Active notice card (NOW only after user opens notices at least once) */}
+          {activeNotice && !toastOpen && hasOpenedNotices ? (
             <div
               className={cx(
                 "absolute right-0 mt-2 w-[380px] z-50",
@@ -2578,7 +4758,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
 
                   <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
                     <div className="text-[11px] text-zinc-500">Impact</div>
-                    <div className="mt-1 text-[13px] text-zinc-800">{activeNotice.impact}</div>
+                    <div className="mt-1 text-[13px] text-zinc-800">
+                      {activeNotice.impact}
+                    </div>
                   </div>
 
                   <AiAnalysisBlock busy={activeBusy} />
@@ -2616,7 +4798,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
 
               <div className="max-h-[360px] overflow-y-auto">
                 {!noticeHistory.length ? (
-                  <div className="px-4 py-4 text-[12px] text-zinc-500">No notices yet.</div>
+                  <div className="px-4 py-4 text-[12px] text-zinc-500">
+                    No notices yet.
+                  </div>
                 ) : (
                   noticeHistory.map((n) => {
                     const busy = !!noticeAnalyzing[n.noticeId];
@@ -3923,9 +6107,11 @@ FILE: components/Workspace.js
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { FileText, GitBranch, Search as SearchIcon, Workflow } from "lucide-react";
+import { FileText, GitBranch, Search as SearchIcon, Workflow, CalendarDays } from "lucide-react";
 
 import RequirementsViewport from "./RequirementsViewport";
+import RequirementsManagerViewport from "./RequirementsManagerViewport";
+import TasksTimelineViewport from "./TasksTimelineViewport"; // ✅ NEW
 import ProcessDiagramViewport from "./ProcessDiagramViewport";
 import RootCauseViewport from "./RootCauseViewport";
 import Workflows from "./Workflows";
@@ -3945,6 +6131,8 @@ export default function Workspace({
 
   const Viewport = useMemo(() => {
     if (tabData.tabId === "requirements") return RequirementsViewport;
+    if (tabData.tabId === "requirementsManager") return RequirementsManagerViewport;
+    if (tabData.tabId === "tasksTimeline") return TasksTimelineViewport; // ✅ NEW
     if (tabData.tabId === "processDiagram") return ProcessDiagramViewport;
     if (tabData.tabId === "workflows") return Workflows;
     return RootCauseViewport;
@@ -3952,6 +6140,8 @@ export default function Workspace({
 
   const Icon = useMemo(() => {
     if (tabData.tabId === "requirements") return FileText;
+    if (tabData.tabId === "requirementsManager") return FileText;
+    if (tabData.tabId === "tasksTimeline") return CalendarDays; // ✅ NEW
     if (tabData.tabId === "processDiagram") return GitBranch;
     if (tabData.tabId === "workflows") return Workflow;
     return SearchIcon;

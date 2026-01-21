@@ -119,7 +119,7 @@ export default function Sidebar({
           </div>
           <div className="min-w-0 leading-tight">
             <div className="text-[13px] font-semibold tracking-tight text-zinc-900 truncate">
-              Engineering Space
+              Mechanical Engineer
             </div>
             <div className="text-[11px] text-zinc-500 truncate">Workspace • mock</div>
           </div>

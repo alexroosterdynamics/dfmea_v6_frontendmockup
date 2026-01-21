@@ -16,7 +16,9 @@ function Pill({ tone = "neutral", children }) {
       : "bg-[#fbfbfa] border-zinc-200/80 text-zinc-700";
 
   return (
-    <span className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}>
+    <span
+      className={cx("text-[11px] px-2 py-1 rounded-full border tracking-tight", cls)}
+    >
       {children}
     </span>
   );
@@ -63,6 +65,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
   } = useDFMEA();
 
   const [toastOpen, setToastOpen] = useState(false);
+
+  // ✅ NEW: prevents automatic popup on initial load
+  const [hasOpenedNotices, setHasOpenedNotices] = useState(false);
 
   const activeLabel = useMemo(
     () => tabs.find((t) => t.id === activeTab)?.label ?? "",
@@ -233,6 +238,7 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
           <button
             onClick={() => {
               setToastOpen((v) => !v);
+              setHasOpenedNotices(true); // ✅ user has interacted
               markAllRead();
             }}
             className={cx(
@@ -251,8 +257,8 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
             ) : null}
           </button>
 
-          {/* Active notice card */}
-          {activeNotice && !toastOpen ? (
+          {/* ✅ Active notice card (NOW only after user opens notices at least once) */}
+          {activeNotice && !toastOpen && hasOpenedNotices ? (
             <div
               className={cx(
                 "absolute right-0 mt-2 w-[380px] z-50",
@@ -310,7 +316,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
 
                   <div className="mt-3 rounded-xl border border-zinc-200/80 bg-[#fbfbfa] p-3">
                     <div className="text-[11px] text-zinc-500">Impact</div>
-                    <div className="mt-1 text-[13px] text-zinc-800">{activeNotice.impact}</div>
+                    <div className="mt-1 text-[13px] text-zinc-800">
+                      {activeNotice.impact}
+                    </div>
                   </div>
 
                   <AiAnalysisBlock busy={activeBusy} />
@@ -348,7 +356,9 @@ export default function TopNav({ tabs, activeTab, onChangeTab, unlockSheets = fa
 
               <div className="max-h-[360px] overflow-y-auto">
                 {!noticeHistory.length ? (
-                  <div className="px-4 py-4 text-[12px] text-zinc-500">No notices yet.</div>
+                  <div className="px-4 py-4 text-[12px] text-zinc-500">
+                    No notices yet.
+                  </div>
                 ) : (
                   noticeHistory.map((n) => {
                     const busy = !!noticeAnalyzing[n.noticeId];

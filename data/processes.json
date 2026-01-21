@@ -1,0 +1,173 @@
+[
+  {
+    "id": "PROC-001",
+    "title": "Auto Root Cause Loop",
+    "description": "Runs whenever DFMEA changes. Builds graph, ranks candidate causes/effects, then suggests controls.",
+    "steps": [
+      "Watch DFMEA changes",
+      "Recompute mapping (Req → Function → Failure Mode)",
+      "Score causes/effects (severity, occurrence, detection)",
+      "Suggest new controls",
+      "Write recommendations back to DFMEA"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "n1", "label": "DFMEA Change", "x": 20, "y": 32 },
+        { "id": "n2", "label": "Graph Build", "x": 220, "y": 32 },
+        { "id": "n3", "label": "Score C/E", "x": 420, "y": 32 },
+        { "id": "n4", "label": "Suggest Controls", "x": 620, "y": 32 },
+        { "id": "n5", "label": "Update DFMEA", "x": 820, "y": 32 }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "label": "trigger" },
+        { "from": "n2", "to": "n3", "label": "compute" },
+        { "from": "n3", "to": "n4", "label": "rank" },
+        { "from": "n4", "to": "n5", "label": "apply" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-002",
+    "title": "Control Quality Gate",
+    "description": "Validates that each high-risk failure mode has prevention + detection coverage.",
+    "steps": [
+      "Identify top-RPN failure modes",
+      "Check linked controls coverage",
+      "Flag gaps",
+      "Propose minimum viable controls"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "m1", "label": "Top RPN", "x": 20, "y": 32 },
+        { "id": "m2", "label": "Coverage Check", "x": 240, "y": 32 },
+        { "id": "m3", "label": "Gap Report", "x": 460, "y": 32 },
+        { "id": "m4", "label": "Propose Controls", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "m1", "to": "m2", "label": "" },
+        { "from": "m2", "to": "m3", "label": "" },
+        { "from": "m3", "to": "m4", "label": "" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-003",
+    "title": "RPN Heatmap Scan",
+    "description": "Finds top risk items and clusters them by requirement impact and function ownership.",
+    "steps": [
+      "Sort failure modes by RPN",
+      "Group by requirement and function",
+      "Identify top 3 hotspots",
+      "Recommend immediate mitigation targets"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "h1", "label": "All FMs", "x": 20, "y": 32 },
+        { "id": "h2", "label": "Sort by RPN", "x": 240, "y": 32 },
+        { "id": "h3", "label": "Cluster", "x": 460, "y": 32 },
+        { "id": "h4", "label": "Hotspots", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "h1", "to": "h2", "label": "" },
+        { "from": "h2", "to": "h3", "label": "" },
+        { "from": "h3", "to": "h4", "label": "" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-004",
+    "title": "Detection Weakness Finder",
+    "description": "Focuses on poor detectability causes and suggests detection controls first.",
+    "steps": [
+      "Locate causes with high detection value",
+      "Estimate monitoring gaps",
+      "Propose detection controls",
+      "Validate against workflow latency constraints"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "d1", "label": "Causes", "x": 20, "y": 32 },
+        { "id": "d2", "label": "High D", "x": 240, "y": 32 },
+        { "id": "d3", "label": "Propose", "x": 460, "y": 32 },
+        { "id": "d4", "label": "Validate", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "d1", "to": "d2", "label": "" },
+        { "from": "d2", "to": "d3", "label": "" },
+        { "from": "d3", "to": "d4", "label": "" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-005",
+    "title": "Severity Driven Prioritization",
+    "description": "Escalates effects with high severity and checks if mitigation controls exist.",
+    "steps": [
+      "Rank effects by severity",
+      "Map to linked failure modes",
+      "Check mitigation controls",
+      "Suggest fail-safe actions"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "s1", "label": "Effects", "x": 20, "y": 32 },
+        { "id": "s2", "label": "Rank S", "x": 240, "y": 32 },
+        { "id": "s3", "label": "Check Controls", "x": 460, "y": 32 },
+        { "id": "s4", "label": "Fail-safe", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "s1", "to": "s2", "label": "" },
+        { "from": "s2", "to": "s3", "label": "" },
+        { "from": "s3", "to": "s4", "label": "" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-006",
+    "title": "Control Coverage Audit",
+    "description": "Ensures high risk areas have Prevention + Detection + Mitigation coverage across the chain.",
+    "steps": [
+      "Traverse Req → FM → Cause/Effect",
+      "Measure control coverage",
+      "Highlight missing layers",
+      "Recommend minimum viable set"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "c1", "label": "Traverse", "x": 20, "y": 32 },
+        { "id": "c2", "label": "Coverage", "x": 240, "y": 32 },
+        { "id": "c3", "label": "Missing", "x": 460, "y": 32 },
+        { "id": "c4", "label": "Recommend", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "c1", "to": "c2", "label": "" },
+        { "from": "c2", "to": "c3", "label": "" },
+        { "from": "c3", "to": "c4", "label": "" }
+      ]
+    }
+  },
+  {
+    "id": "PROC-007",
+    "title": "Cross-Requirement Coupling Check",
+    "description": "Detects shared functions that impact multiple requirements (risk propagation).",
+    "steps": [
+      "Find functions linked to >1 requirement",
+      "Mark shared failure modes",
+      "Assess propagation severity",
+      "Recommend isolation controls"
+    ],
+    "diagram": {
+      "nodes": [
+        { "id": "x1", "label": "Functions", "x": 20, "y": 32 },
+        { "id": "x2", "label": "Shared", "x": 240, "y": 32 },
+        { "id": "x3", "label": "Propagation", "x": 460, "y": 32 },
+        { "id": "x4", "label": "Isolate", "x": 680, "y": 32 }
+      ],
+      "edges": [
+        { "from": "x1", "to": "x2", "label": "" },
+        { "from": "x2", "to": "x3", "label": "" },
+        { "from": "x3", "to": "x4", "label": "" }
+      ]
+    }
+  }
+]
